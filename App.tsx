@@ -17,7 +17,7 @@ import { VesselSnapshot } from './src/services/VesselSnapshot';
 import { GridSync } from './src/services/GridSync';
 import { MarineHazard } from './src/utils/geoUtils';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
-// Expo's bundled sqlite-vec extension loaded via SQLite.bundledExtensions
+// Expo's bundled sqlite-vec - loaded via SQLite.bundledExtensions['sqlite-vec']
 import type { FeatureCollection, Point } from 'geojson';
 
 import { RemoteConfig } from './src/services/RemoteConfig';
@@ -72,10 +72,15 @@ export default function App() {
       console.log('[App] Loading Expo bundled sqlite-vec extension...');
       const extension = SQLite.bundledExtensions['sqlite-vec'];
       if (!extension) {
-        console.error('[App] sqlite-vec not in bundledExtensions - did you enable withSQLiteVecExtension?');
+        console.error('[App] ERROR: sqlite-vec not in bundledExtensions');
+        console.error('[App] Did you enable withSQLiteVecExtension in app.config.js?');
       } else {
-        await db.loadExtensionAsync(extension.libPath, extension.entryPoint);
-        console.log('[App] ✅ sqlite-vec extension loaded successfully');
+        try {
+          await db.loadExtensionAsync(extension.libPath, extension.entryPoint);
+          console.log('[App] ✅ sqlite-vec extension loaded successfully');
+        } catch (error) {
+          console.error('[App] ERROR: Failed to load sqlite-vec extension:', error);
+        }
       }
 
       // 3. Initialize VecDB
