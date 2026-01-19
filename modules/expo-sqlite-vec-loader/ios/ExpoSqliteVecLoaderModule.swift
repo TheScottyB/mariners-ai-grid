@@ -12,6 +12,7 @@ import SQLite3
  */
 
 // External reference to sqlite3_vec_init from statically linked libsqlite_vec.a
+// We use @_silgen_name to link to the C symbol name exactly
 @_silgen_name("sqlite3_vec_init")
 func sqlite3_vec_init(
   _ db: OpaquePointer?,
@@ -53,6 +54,7 @@ public class ExpoSqliteVecLoaderModule: Module {
     }
     
     // Register the auto-extension
+    // unsafeBitCast is required to convert the Swift closure to a C function pointer
     let result = sqlite3_auto_extension(unsafeBitCast(autoExtension, to: (@convention(c) () -> Void).self))
     
     if result != SQLITE_OK {
@@ -62,7 +64,8 @@ public class ExpoSqliteVecLoaderModule: Module {
     
     NSLog("[ExpoSqliteVecLoader] ✅ Auto-extension registered successfully")
     
-    // Test by opening a temporary connection
+    // Test by opening a temporary connection to verify
+    // This ensures the symbols are actually linked and working
     var db: OpaquePointer?
     if sqlite3_open(":memory:", &db) == SQLITE_OK {
       defer { sqlite3_close(db) }
@@ -76,7 +79,7 @@ public class ExpoSqliteVecLoaderModule: Module {
         }
         sqlite3_finalize(stmt)
       } else {
-        NSLog("[ExpoSqliteVecLoader] WARNING: vec_version() not available - extension may not have loaded")
+        NSLog("[ExpoSqliteVecLoader] WARNING: vec_version() not available in verification step - extension may not have loaded")
       }
     }
     

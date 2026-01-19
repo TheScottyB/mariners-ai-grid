@@ -96,6 +96,12 @@ export default ({ config }) => {
       "expo-location",
       "expo-sqlite",
       [
+        "expo-sqlite",
+        {
+          "withSQLiteVecExtension": true
+        }
+      ],
+      [
         "expo-build-properties",
         {
           ios: {
@@ -114,13 +120,7 @@ export default ({ config }) => {
           RNMapboxMapsVersion: "11.16.2"
         }
       ],
-      [
-        "./plugins/with-sqlite-vec/withSqliteVec.js",
-        {
-          version: "0.1.6",
-          debug: IS_DEV
-        }
-      ]
+      // sqlite-vec now loaded via Expo's bundled extension (see expo-sqlite plugin above)
     ],
     extra: {
       eas: {

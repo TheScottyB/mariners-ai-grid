@@ -42,6 +42,7 @@
     "expo-secure-store": "~15.0.8",
     "expo-sensors": "~15.0.8",
     "expo-sqlite": "~16.0.10",
+    "expo-sqlite-vec-loader": "link:modules/expo-sqlite-vec-loader",
     "expo-status-bar": "~3.0.9",
     "expo-task-manager": "~14.0.9",
     "expo-updates": "^29.0.16",

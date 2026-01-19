@@ -4,6 +4,6 @@
     "modules": ["ExpoSqliteVecLoaderModule"]
   },
   "android": {
-    "modules": ["expo.modules.sqlitevecloader.ExpoSqliteVecLoaderModule"]
+    "modules": ["ExpoSqliteVecLoaderModule"]
   }
 }

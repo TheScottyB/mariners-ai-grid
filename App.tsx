@@ -17,7 +17,7 @@ import { VesselSnapshot } from './src/services/VesselSnapshot';
 import { GridSync } from './src/services/GridSync';
 import { MarineHazard } from './src/utils/geoUtils';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
-import { loadVecExtension } from './modules/expo-sqlite-vec-loader';
+// Expo's bundled sqlite-vec extension loaded via SQLite.bundledExtensions
 import type { FeatureCollection, Point } from 'geojson';
 
 import { RemoteConfig } from './src/services/RemoteConfig';
@@ -64,16 +64,19 @@ export default function App() {
       // 0. Initialize Remote Config
       await RemoteConfig.getInstance().initialize();
 
-      // 1. Register sqlite-vec auto-extension BEFORE opening database
-      console.log('[App] Registering sqlite-vec auto-extension...');
-      const vecLoaded = await loadVecExtension('mariners_grid.db');
-      if (!vecLoaded) {
-        console.warn('[App] sqlite-vec extension registration failed - vector search unavailable');
-      }
-
-      // 2. Initialize SQLite Database (auto-extension will load for this connection)
+      // 1. Initialize SQLite Database
       const db = await SQLite.openDatabaseAsync('mariners_grid.db');
       dbRef.current = db;
+
+      // 2. Load Expo's bundled sqlite-vec extension
+      console.log('[App] Loading Expo bundled sqlite-vec extension...');
+      const extension = SQLite.bundledExtensions['sqlite-vec'];
+      if (!extension) {
+        console.error('[App] sqlite-vec not in bundledExtensions - did you enable withSQLiteVecExtension?');
+      } else {
+        await db.loadExtensionAsync(extension.libPath, extension.entryPoint);
+        console.log('[App] ✅ sqlite-vec extension loaded successfully');
+      }
 
       // 3. Initialize VecDB
       const vecDb = new VecDB(db);

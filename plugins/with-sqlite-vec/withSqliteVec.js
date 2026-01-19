@@ -234,13 +234,6 @@ const withSqliteVec = (config, props = {}) => {
       const targetPodspecPath = path.join(targetPodspecDir, 'sqlite-vec.podspec');
       fs.copyFileSync(sourcePodspec, targetPodspecPath);
       
-      // Copy auto-init C file (Keep it for now)
-      const sourceInitFile = path.join(projectRoot, 'plugins', 'with-sqlite-vec', 'sqlite-vec-auto-init.c');
-      const targetInitFile = path.join(targetPodspecDir, 'sqlite-vec-auto-init.c');
-      if (fs.existsSync(sourceInitFile)) {
-         fs.copyFileSync(sourceInitFile, targetInitFile);
-      }
-
       // Configure Podfile
       if (fs.existsSync(podfilePath)) {
         let podfileContent = fs.readFileSync(podfilePath, 'utf8');

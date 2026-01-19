@@ -1,40 +1,21 @@
 import { requireNativeModule } from 'expo-modules-core';
 
-/**
- * Native module for loading sqlite-vec extension into ExpoSQLite databases.
- */
-const ExpoSqliteVecLoaderModule = requireNativeModule('ExpoSqliteVecLoader');
+// Get the native module
+const ExpoSqliteVecLoader = requireNativeModule('ExpoSqliteVecLoader');
 
 /**
- * Load the sqlite-vec extension into the specified database.
+ * Loads the sqlite-vec extension into the SQLite environment.
+ * This registers the extension globally (auto-extension) so it applies
+ * to all future connections.
  * 
- * This must be called after opening a database with expo-sqlite to enable
- * vector search capabilities.
- * 
- * @param databaseName - The name of the database (e.g., 'mariners_grid.db')
- * @returns Promise that resolves to true if successful, false otherwise
- * 
- * @example
- * ```typescript
- * import * as SQLite from 'expo-sqlite';
- * import { loadVecExtension } from './modules/expo-sqlite-vec-loader';
- * 
- * const db = await SQLite.openDatabaseAsync('mydb.db');
- * const loaded = await loadVecExtension('mydb.db');
- * if (loaded) {
- *   console.log('Vector search enabled!');
- * }
- * ```
+ * @param databaseName - Optional name of the database (mostly for logging)
+ * @returns Promise<boolean> - true if successful
  */
-export async function loadVecExtension(databaseName: string): Promise<boolean> {
+export async function loadVecExtension(databaseName: string = 'default'): Promise<boolean> {
   try {
-    return await ExpoSqliteVecLoaderModule.loadVecExtension(databaseName);
-  } catch (error) {
-    console.error('[loadVecExtension] Failed to load sqlite-vec:', error);
+    return await ExpoSqliteVecLoader.loadVecExtension(databaseName);
+  } catch (e) {
+    console.error('[ExpoSqliteVecLoader] Failed to load extension:', e);
     return false;
   }
 }
-
-export default {
-  loadVecExtension,
-};
