@@ -19,6 +19,7 @@
 import * as Network from 'expo-network';
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
+import * as Notifications from 'expo-notifications';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { VesselSnapshot, DivergenceSnapshot, SnapshotQueueItem } from './VesselSnapshot';
 import { VecDB, AtmosphericVector } from './VecDB';
@@ -37,6 +38,8 @@ const ENDPOINTS = {
   hazards: `${GRID_API_BASE}/hazards`,
   patterns: `${GRID_API_BASE}/patterns`,
   health: `${GRID_API_BASE}/health`,
+  pushTokens: `${GRID_API_BASE}/push-tokens`,
+  emergencyBroadcast: `${GRID_API_BASE}/emergency-broadcast`,
 };
 
 // Sync configuration
@@ -106,6 +109,18 @@ export interface SyncStatus {
   connectionType: string | null;
   pendingUploads: number;
   backgroundTaskRegistered: boolean;
+  pushTokenRegistered: boolean;
+}
+
+export interface EmergencyBroadcastData {
+  type: 'divergence' | 'gale' | 'storm' | 'hazard';
+  severity: 'elevated' | 'high' | 'critical';
+  title: string;
+  message: string;
+  location: { lat: number; lon: number };
+  tss: number;  // Trend Severity Score
+  timestamp: number;
+  sourceVesselHash: string;  // SHA-256 truncated for privacy
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,11 +135,13 @@ export class GridSync {
   private lastSyncResult: SyncResult | null = null;
   private lastSyncTime: number | null = null;
   private isSyncing: boolean = false;
+  private pushToken: string | null = null;
 
   // Callbacks
   private onHazardReceived?: (hazard: GridHazard) => void;
   private onPatternLearned?: (pattern: GridPattern) => void;
   private onSyncComplete?: (result: SyncResult) => void;
+  private onEmergencyBroadcast?: (data: EmergencyBroadcastData) => void;
 
   constructor(db: SQLiteDatabase, vesselSnapshot: VesselSnapshot, vecDb: VecDB) {
     this.db = db;
@@ -584,6 +601,7 @@ export class GridSync {
       connectionType: networkState.type ?? null,
       pendingUploads: pendingResult?.count ?? 0,
       backgroundTaskRegistered,
+      pushTokenRegistered: this.pushToken !== null,
     };
   }
 
@@ -644,6 +662,111 @@ export class GridSync {
     // In production, fetch from grid API
     // For now, return empty (no mock patterns)
     return [];
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Push Notification Methods
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Register push token with the Grid backend for emergency broadcasts.
+   * The token is associated with the vessel's anonymous region for targeted alerts.
+   */
+  async registerPushToken(token: string): Promise<boolean> {
+    this.pushToken = token;
+
+    if (!this.currentPosition) {
+      console.warn('[GridSync] Cannot register push token: no position set');
+      return false;
+    }
+
+    try {
+      // In production, this would POST to the grid API
+      // For now, store locally
+      await this.db.runAsync(
+        `INSERT OR REPLACE INTO grid_sync_meta (key, value, updated_at) VALUES ('push_token', ?, ?)`,
+        [token, Date.now()]
+      );
+
+      console.log(`[GridSync] Push token registered: ${token.slice(0, 20)}...`);
+      return true;
+    } catch (error) {
+      console.error('[GridSync] Failed to register push token:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Broadcast a Priority 1 emergency snapshot to nearby vessels.
+   * Used when Emergency Mode is triggered to warn the fleet.
+   */
+  async broadcastEmergency(data: EmergencyBroadcastData): Promise<boolean> {
+    if (!this.currentPosition) {
+      console.warn('[GridSync] Cannot broadcast emergency: no position set');
+      return false;
+    }
+
+    try {
+      // Create emergency snapshot for upload queue
+      console.log(`[GridSync] Broadcasting PRIORITY 1 emergency: ${data.type} - ${data.severity}`);
+
+      // In production, this would:
+      // 1. POST to emergency-broadcast endpoint
+      // 2. Backend fans out push notifications to vessels within radius
+      // 3. Returns acknowledgment
+
+      // Simulate broadcast
+      await this.simulateEmergencyBroadcast(data);
+
+      // Also trigger local notification for testing
+      await this.sendLocalEmergencyNotification(data);
+
+      return true;
+    } catch (error) {
+      console.error('[GridSync] Failed to broadcast emergency:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Register callback for incoming emergency broadcasts from fleet.
+   */
+  onEmergency(callback: (data: EmergencyBroadcastData) => void): void {
+    this.onEmergencyBroadcast = callback;
+  }
+
+  /**
+   * Send a local notification for emergency alerts.
+   */
+  private async sendLocalEmergencyNotification(data: EmergencyBroadcastData): Promise<void> {
+    const severityEmoji = {
+      elevated: '??????',
+      high: '??????',
+      critical: '????',
+    }[data.severity];
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `${severityEmoji} ${data.title}`,
+        body: data.message,
+        data: {
+          type: 'emergency_broadcast',
+          priority: 'emergency',
+          ...data,
+        },
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+      },
+      trigger: null, // Immediate
+    });
+  }
+
+  /**
+   * Simulate emergency broadcast (replace with actual API call).
+   */
+  private async simulateEmergencyBroadcast(data: EmergencyBroadcastData): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    console.log(`[GridSync] Emergency broadcast simulated: TSS ${data.tss}, ${data.type}`);
   }
 }
 
