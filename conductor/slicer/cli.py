@@ -4,16 +4,10 @@
 
 """
 Command-line interface for the Weather Data Slicer.
-
-Usage:
-    mag-slicer slice --lat 37.0 --lon -135.0 --radius 500 --hours 72
-    mag-slicer demo
-    mag-slicer info <seed_file>
 """
 
 import logging
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import click
@@ -29,55 +23,40 @@ logging.basicConfig(level=logging.INFO)
 @click.group()
 @click.version_option(version="0.1.0", prog_name="mag-slicer")
 def main():
-    """
-    Mariner's AI Grid - Weather Data Slicer
-
-    Extract regional weather data from ECMWF HRES for offshore navigation.
-    Reduces 10GB global files to ~5MB satellite-transmittable Seeds.
-    """
     pass
 
 
 @main.command()
-@click.option("--lat", type=float, required=True, help="Center latitude (degrees)")
-@click.option("--lon", type=float, required=True, help="Center longitude (degrees)")
-@click.option("--radius", type=float, default=500, help="Radius in nautical miles (default: 500)")
-@click.option("--hours", type=int, default=72, help="Forecast hours (default: 72)")
-@click.option("--step", type=int, default=3, help="Time step hours (default: 3)")
-@click.option("--variables", type=str, default="standard",
-              help="Variable set: minimal, standard, full (default: standard)")
-@click.option("--format", "output_format", type=click.Choice(["parquet", "protobuf", "both"]),
-              default="protobuf", help="Output format (default: protobuf)")
-@click.option("--output", "-o", type=Path, default=Path("./seeds"),
-              help="Output directory (default: ./seeds)")
-@click.option("--offline", is_flag=True, help="Use mock data (no CDS API)")
+@click.option("--lat", type=float, required=True, help="Center latitude")
+@click.option("--lon", type=float, required=True, help="Center longitude")
+@click.option("--radius", type=float, default=500, help="Radius (nm)")
+@click.option("--hours", type=int, default=72, help="Forecast hours")
+@click.option("--step", type=int, default=3, help="Time step hours")
+@click.option("--variables", type=str, default="standard", help="Variable set")
+@click.option("--format", "output_format", type=click.Choice(["parquet", "protobuf", "both"]), default="protobuf", help="Output format")
+@click.option("--output", "-o", type=Path, default=Path("./seeds"), help="Output dir")
+@click.option("--offline", is_flag=True, help="Use mock data")
 def slice(lat: float, lon: float, radius: float, hours: int, step: int,
           variables: str, output_format: str, output: Path, offline: bool):
-    """
-    Extract a regional weather slice.
-
-    Example: Extract 500nm around Hawaii approach
-        mag-slicer slice --lat 21.3 --lon -157.8 --radius 500 --hours 72
-    """
+    """Extract a regional weather slice."""
     from slicer.core import BoundingBox, ECMWFHRESSlicer
-    from slicer.export import SeedExporter, compare_formats
+    from slicer.export import SeedExporter
     from slicer.variables import MINIMAL_VARIABLES, STANDARD_VARIABLES, FULL_VARIABLES
 
-    console.print(Panel.fit(
-        "[bold blue]Mariner's AI Grid - Weather Slicer[/]\n"
-        f"Extracting {radius}nm radius around ({lat:.2f}°, {lon:.2f}°)",
-        border_style="blue"
-    ))
+    title = "Mariner's AI Grid - Weather Slicer\n"
+    title += f"Extracting {radius}nm radius around ({lat:.2f}, {lon:.2f})"
+    console.print(Panel.fit(title, border_style="blue"))
 
-    # Create bounding box
     bbox = BoundingBox.from_center(lat, lon, radius)
 
-    console.print(f"\n[dim]Region:[/]
-    {bbox.lat_min:.2f}° to {bbox.lat_max:.2f}°N, {bbox.lon_min:.2f}° to {bbox.lon_max:.2f}°E")
-    console.print(f"[dim]Coverage:[/]
-    {bbox.area_sq_nm:,.0f} sq nm")
+    region = f"{bbox.lat_min:.2f} to {bbox.lat_max:.2f}N, "
+    region += f"{bbox.lon_min:.2f} to {bbox.lon_max:.2f}E"
+    console.print("\n[dim]Region:[/]")
+    console.print(region)
+    
+    cov_str = f"{bbox.area_sq_nm:,.0f}"
+    console.print(f"[dim]Coverage:[/]{cov_str} sq nm")
 
-    # Determine variable set
     var_map = {
         "minimal": MINIMAL_VARIABLES,
         "standard": STANDARD_VARIABLES,
@@ -85,18 +64,14 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
     }
     var_list = var_map.get(variables, STANDARD_VARIABLES)
 
-    console.print(f"[dim]Variables:[/]
-    {len(var_list)} ({variables})")
-    console.print(f"[dim]Forecast:[/]
-    {hours}h at {step}h intervals")
+    console.print(f"[dim]Variables:[/]{len(var_list)} ({variables})")
+    console.print(f"[dim]Forecast:[/]{hours}h at {step}h intervals")
 
-    # Initialize slicer
     slicer = ECMWFHRESSlicer(
         cache_dir=output / ".cache",
         offline_mode=offline,
     )
 
-    # Perform slicing
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -116,24 +91,27 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
 
         progress.update(task, completed=True)
 
-    # Display seed info
     table = Table(title="Seed Generated", show_header=False)
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="green")
 
     table.add_row("Seed ID", seed.seed_id)
     table.add_row("Model Source", seed.model_source)
-    table.add_row("Model Run", seed.model_run.strftime("%Y-%m-%d %H:%M UTC"))
-    table.add_row("Grid Shape", f"{seed.shape[1]} x {seed.shape[2]} points")
+    run_str = seed.model_run.strftime("%Y-%m-%d %H:%M UTC")
+    table.add_row("Model Run", run_str)
+    
+    shape_str = f"{seed.shape[1]} x {seed.shape[2]} points"
+    table.add_row("Grid Shape", shape_str)
+    
     table.add_row("Time Steps", str(seed.shape[0]))
     table.add_row("Variables", str(len(seed.variables)))
-    table.add_row("Raw Size", f"{seed.size_bytes_uncompressed() / 1024:.1f} KB")
+    
+    raw_kb = seed.size_bytes_uncompressed() / 1024
+    table.add_row("Raw Size", f"{raw_kb:.1f} KB")
 
     console.print(table)
 
-    # Export
     exporter = SeedExporter(output)
-
     export_results = []
 
     if output_format in ("parquet", "both"):
@@ -150,23 +128,21 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
             path, stats = exporter.to_protobuf(seed)
             export_results.append(("Protobuf", path, stats))
 
-    # Display export results
     console.print("\n[bold]Export Results:[/]")
 
     for fmt, path, stats in export_results:
         costs = stats.cost_estimates
         cost_str = "\n".join([f"  {k}: ${v:.2f}" for k, v in costs.items()])
         
-        console.print(Panel.fit(
-            f"[bold]{fmt}[/]\n"
-            f"File: {path}\n"
-            f"Size: [green]{stats.output_bytes / 1024:.1f} KB[/]\n"
-            f"Compression: [cyan]{stats.compression_ratio:.1f}x[/]\n"
-            f"[yellow]Satellite Costs (Est.):[/]\n{cost_str}",
-            border_style="green"
-        ))
+        size_kb = stats.output_bytes / 1024
+        comp_ratio = stats.compression_ratio
+        
+        content = f"[bold]{fmt}[/]\nFile: {path}\n"
+        content += f"Size: [green]{size_kb:.1f} KB[/]\n"
+        content += f"Compression: [cyan]{comp_ratio:.1f}x[/]\n"
+        content += f"[yellow]Satellite Costs (Est.):[/]\n{cost_str}"
+        console.print(Panel.fit(content, border_style="green"))
 
-    # Summary
     if export_results:
         best = min(export_results, key=lambda x: x[2].output_bytes)
         console.print(f"\n[bold green]Success![/] Recommended format: {best[0]}")
@@ -175,35 +151,27 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
 
 @main.command()
 def demo():
-    """
-    Run demo: San Francisco to Hawaii passage.
-
-    Demonstrates the slicer with realistic Pacific crossing scenario.
-    """
+    """Run demo: San Francisco to Hawaii passage."""
     from slicer.core import BoundingBox, ECMWFHRESSlicer
     from slicer.export import SeedExporter, compare_formats
 
-    console.print(Panel.fit(
-        "[bold blue]Demo: Pacific Crossing Weather Slice[/]\n"
-        "San Francisco to Hawaii - Midpoint extraction",
-        border_style="blue"
-    ))
+    title = "Demo: Pacific Crossing Weather Slice\n"
+    title += "San Francisco to Hawaii - Midpoint extraction"
+    console.print(Panel.fit(title, border_style="blue"))
 
     console.print("\n[bold]Scenario:[/]")
-    console.print("  Route: San Francisco (37.8°N, 122.4°W) → Honolulu (21.3°N, 157.8°W)")
-    console.print("  Midpoint: ~30°N, 140°W")
-    console.print("  Coverage: 500nm radius (typical sailing vessel planning window)")
+    console.print("  Route: SF (37.8N, 122.4W) -> HNL (21.3N, 157.8W)")
+    console.print("  Midpoint: ~30N, 140W")
+    console.print("  Coverage: 500nm radius")
     console.print("  Forecast: 72 hours at 3-hour intervals")
 
-    # Midpoint of SF-Honolulu great circle
     bbox = BoundingBox.from_center(lat=30.0, lon=-140.0, radius_nm=500)
 
-    console.print(f"\n[dim]Bounding box:[/]")
-    console.print(f"  Latitude:  {bbox.lat_min:.1f}° to {bbox.lat_max:.1f}°N")
-    console.print(f"  Longitude: {bbox.lon_min:.1f}° to {bbox.lon_max:.1f}°W")
-    console.print(f"  Area: {bbox.area_sq_nm:,.0f} sq nm\n")
+    region = f"Latitude: {bbox.lat_min:.1f} to {bbox.lat_max:.1f}N\n"
+    region += f"  Longitude: {bbox.lon_min:.1f} to {bbox.lon_max:.1f}W\n"
+    region += f"  Area: {bbox.area_sq_nm:,.0f} sq nm"
+    console.print(f"\n[dim]Bounding box:[/]\n  {region}")
 
-    # Generate mock seed
     slicer = ECMWFHRESSlicer(offline_mode=True)
 
     with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
@@ -211,36 +179,25 @@ def demo():
         progress.add_task("Generating mock weather data...", total=None)
         seed = slicer.slice(bbox, forecast_hours=72, time_step_hours=3)
 
-    # Display seed characteristics
     table = Table(title="Weather Seed Generated")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
     table.add_column("Notes", style="dim")
 
-    table.add_row(
-        "Grid Points",
-        f"{seed.shape[1]} × {seed.shape[2]}",
-        f"= {seed.shape[1] * seed.shape[2]:,} points"
-    )
-    table.add_row(
-        "Time Steps",
-        str(seed.shape[0]),
-        f"0-72h at 3h intervals"
-    )
-    table.add_row(
-        "Variables",
-        str(len(seed.variables)),
-        ", ".join(seed.variables.keys())
-    )
-    table.add_row(
-        "Raw Size",
-        f"{seed.size_bytes_uncompressed() / 1024:.1f} KB",
-        "Before compression"
-    )
+    shape_str = f"{seed.shape[1]} x {seed.shape[2]}"
+    pts_str = f"= {seed.shape[1] * seed.shape[2]:,} points"
+    table.add_row("Grid Points", shape_str, pts_str)
+    
+    table.add_row("Time Steps", str(seed.shape[0]), "0-72h at 3h intervals")
+    
+    vars_str = ", ".join(seed.variables.keys())
+    table.add_row("Variables", str(len(seed.variables)), vars_str)
+    
+    raw_kb = seed.size_bytes_uncompressed() / 1024
+    table.add_row("Raw Size", f"{raw_kb:.1f} KB", "Before compression")
 
     console.print(table)
 
-    # Export and compare formats
     output_dir = Path("./demo_seeds")
     comparison = compare_formats(seed, output_dir)
 
@@ -249,54 +206,43 @@ def demo():
     comp_table = Table()
     comp_table.add_column("Format", style="cyan")
     comp_table.add_column("Size", style="green")
-    comp_table.add_column("Compression", style="yellow")
-    comp_table.add_column("Cost: Starlink", style="magenta")
-    comp_table.add_column("Cost: Iridium", style="red")
+    comp_table.add_column("Comp.", style="yellow")
+    comp_table.add_column("Starlink", style="magenta")
+    comp_table.add_column("Iridium", style="red")
 
-    # Extract costs safely
-    pq_costs = comparison['parquet']['cost_estimates']
-    pb_costs = comparison['protobuf']['cost_estimates']
+    pq = comparison['parquet']
+    pb = comparison['protobuf']
+    
+    pq_sl = pq['cost_estimates']['starlink']
+    pq_ir = pq['cost_estimates']['iridium_certus_100']
+    
+    pb_sl = pb['cost_estimates']['starlink']
+    pb_ir = pb['cost_estimates']['iridium_certus_100']
 
-    comp_table.add_row(
-        "Parquet",
-        f"{comparison['parquet']['size_kb']:.1f} KB",
-        f"{comparison['parquet']['compression_ratio']:.1f}x",
-        f"${pq_costs['starlink']:.2f}",
-        f"${pq_costs['iridium_certus_100']:.2f}",
-    )
-    comp_table.add_row(
-        "Protobuf+zstd",
-        f"{comparison['protobuf']['size_kb']:.1f} KB",
-        f"{comparison['protobuf']['compression_ratio']:.1f}x",
-        f"${pb_costs['starlink']:.2f}",
-        f"${pb_costs['iridium_certus_100']:.2f}",
-    )
+    comp_table.add_row("Parquet", f"{pq['size_kb']:.1f} KB", f"{pq['compression_ratio']:.1f}x", f"${pq_sl:.2f}", f"${pq_ir:.2f}")
+    comp_table.add_row("Protobuf", f"{pb['size_kb']:.1f} KB", f"{pb['compression_ratio']:.1f}x", f"${pb_sl:.2f}", f"${pb_ir:.2f}")
 
     console.print(comp_table)
 
-    # Key insights
-    console.print(Panel.fit(
-        "[bold]Key Insights:[/]\n\n"
-        "• [green]10GB global GRIB → ~5MB regional Seed[/] (2000x reduction)\n"
-        "• Regional cropping: extracts only 500nm around route\n"
-        "• Variable pruning: 100+ variables → 8 marine-essential\n"
-        "• Precision quantization: reduces entropy for better compression\n"
-        "• Zstandard compression: 70-80% size reduction\n\n"
-        f"[bold]Recommended format:[/]
-    f"{comparison['recommendation'].upper()}"
-        f"[bold]Files saved to:[/]
-    f"{output_dir.absolute()}",
-        title="Summary",
-        border_style="green"
-    ))
+    rec = comparison['recommendation'].upper()
+    save_path = output_dir.absolute()
+    
+    summary = "[bold]Key Insights:[/]\n\n"
+    summary += "• [green]10GB global GRIB -> ~5MB regional Seed[/]\n"
+    summary += "• Regional cropping: extracts only 500nm around route\n"
+    summary += "• Variable pruning: 100+ variables -> 8 marine-essential\n"
+    summary += "• Precision quantization: reduces entropy\n"
+    summary += "• Zstandard compression: 70-80% size reduction\n\n"
+    summary += f"[bold]Recommended format:[/]{rec}\n"
+    summary += f"[bold]Files saved to:[/]{save_path}"
+    
+    console.print(Panel.fit(summary, title="Summary", border_style="green"))
 
 
 @main.command()
 @click.argument("seed_file", type=Path)
 def info(seed_file: Path):
-    """
-    Display information about a .seed.zst file.
-    """
+    """Display information about a .seed.zst file."""
     from slicer.export import SeedExporter
 
     if not seed_file.exists():
@@ -315,21 +261,29 @@ def info(seed_file: Path):
 
         table.add_row("Seed ID", seed.seed_id)
         table.add_row("Model Source", seed.model_source)
-        table.add_row("Model Run", seed.model_run.strftime("%Y-%m-%d %H:%M UTC"))
-        table.add_row("Forecast Range",
-                      f"{seed.forecast_start.strftime('%m/%d %H:%M')}
-                      f"{seed.forecast_end.strftime('%m/%d %H:%M')}")
-        table.add_row("Resolution", f"{seed.resolution_deg}°")
+        
+        run_str = seed.model_run.strftime("%Y-%m-%d %H:%M UTC")
+        table.add_row("Model Run", run_str)
+        
+        start_str = seed.forecast_start.strftime('%m/%d %H:%M')
+        end_str = seed.forecast_end.strftime('%m/%d %H:%M')
+        table.add_row("Forecast Range", f"{start_str} -> {end_str}")
+        
+        table.add_row("Resolution", f"{seed.resolution_deg}")
         table.add_row("Grid Shape", f"{seed.shape}")
-        table.add_row("Variables", ", ".join(sorted(seed.variables.keys())))
-        table.add_row("Bounding Box",
-                      f"{seed.bounding_box.lat_min:.1f}° to {seed.bounding_box.lat_max:.1f}°N\n"
-                      f"{seed.bounding_box.lon_min:.1f}° to {seed.bounding_box.lon_max:.1f}°E")
-        table.add_row("File Size", f"{seed_file.stat().st_size / 1024:.1f} KB")
+        
+        vars_str = ", ".join(sorted(seed.variables.keys()))
+        table.add_row("Variables", vars_str)
+        
+        bbox_str = f"{seed.bounding_box.lat_min:.1f} to {seed.bounding_box.lat_max:.1f}N\n"
+        bbox_str += f"{seed.bounding_box.lon_min:.1f} to {seed.bounding_box.lon_max:.1f}E"
+        table.add_row("Bounding Box", bbox_str)
+        
+        size_kb = seed_file.stat().st_size / 1024
+        table.add_row("File Size", f"{size_kb:.1f} KB")
 
         console.print(table)
 
-        # Validate
         issues = seed.validate()
         if issues:
             console.print("\n[yellow]Validation Issues:[/]")
@@ -348,9 +302,7 @@ def info(seed_file: Path):
 @click.option("--lon", type=float, required=True, help="Center longitude")
 @click.option("--radius", type=float, default=500, help="Radius in nm")
 def estimate(lat: float, lon: float, radius: float):
-    """
-    Estimate download size and cost without fetching data.
-    """
+    """Estimate download size and cost."""
     from slicer.core import BoundingBox
     from slicer.variables import VariablePruner
     from slicer.cost_model import SatelliteCostModel
@@ -358,26 +310,25 @@ def estimate(lat: float, lon: float, radius: float):
     bbox = BoundingBox.from_center(lat, lon, radius)
     pruner = VariablePruner("standard")
 
-    # Estimate grid size at 0.25° resolution
     lat_points = int((bbox.lat_max - bbox.lat_min) / 0.25) + 1
     lon_points = int((bbox.lon_max - bbox.lon_min) / 0.25) + 1
-    time_steps = 25  # 0-72h at 3h intervals
+    time_steps = 25
 
-    estimated_mb = pruner.estimate_pruned_size_mb(lat_points, lon_points, time_steps)
-    
-    # Calculate costs
-    costs = SatelliteCostModel.get_all_estimates(int(estimated_mb * 1024 * 1024))
+    est_mb = pruner.estimate_pruned_size_mb(lat_points, lon_points, time_steps)
+    costs = SatelliteCostModel.get_all_estimates(int(est_mb * 1024 * 1024))
 
     table = Table(title="Size Estimate")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
 
-    table.add_row("Region", f"{bbox.lat_min:.1f}° to {bbox.lat_max:.1f}°N, "
-                           f"{bbox.lon_min:.1f}° to {bbox.lon_max:.1f}°E")
-    table.add_row("Grid Points", f"{lat_points} × {lon_points}")
+    region = f"{bbox.lat_min:.1f} to {bbox.lat_max:.1f}N, "
+    region += f"{bbox.lon_min:.1f} to {bbox.lon_max:.1f}E"
+    table.add_row("Region", region)
+    
+    table.add_row("Grid Points", f"{lat_points} x {lon_points}")
     table.add_row("Time Steps", str(time_steps))
     table.add_row("Variables", str(len(pruner.variables)))
-    table.add_row("Est. Compressed Size", f"{estimated_mb:.2f} MB")
+    table.add_row("Est. Compressed Size", f"{est_mb:.2f} MB")
     
     table.add_row("Cost: Starlink", f"${costs['starlink']:.2f}")
     table.add_row("Cost: Iridium Certus 100", f"${costs['iridium_certus_100']:.2f}")

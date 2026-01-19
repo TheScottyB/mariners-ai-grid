@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mariner's AI Grid - Liquid Glass Custom Utilities */
+@layer utilities {
+  .glass-panel {
+    @apply bg-glass backdrop-blur-glass border border-glass-border;
+  }
+
+  .glass-panel-dark {
+    @apply bg-glass-dark backdrop-blur-glass border border-glass-border;
+  }
+
+  .consensus-badge {
+    @apply px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider;
+  }
+}

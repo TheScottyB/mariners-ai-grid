@@ -1,65 +1,284 @@
 /**
  * Mariner's AI Grid - Pattern Alert Component
  *
- * Displays weather pattern match alerts with:
- * - Color-coded danger levels (IMO standard colors)
+ * Tactical "Liquid Glass" design with NativeWind styling.
+ * Features:
+ * - IMO color-coded danger levels with glass morphism
+ * - Consensus View: Local Pattern Match vs GraphCast Prediction
  * - Haptic feedback for critical alerts
- * - Expandable recommendations
- * - Acknowledgment flow
+ * - vibeSearch integration for similar historical outcomes
+ *
+ * @module PatternAlert
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   Animated,
   Dimensions,
   ScrollView,
   Platform,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { styled } from 'nativewind';
 
 import type { PatternAlert as PatternAlertType, DangerLevel } from '../services/PatternMatcher';
+import type { AtmosphericPattern } from '../services/VecDB';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IMO Standard Alert Colors
+// Styled Components
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ALERT_COLORS: Record<DangerLevel, { bg: string; border: string; text: string; icon: string }> = {
+const StyledView = styled(View);
+const StyledText = styled(Text);
+const StyledTouchable = styled(TouchableOpacity);
+const StyledScrollView = styled(ScrollView);
+const StyledBlur = styled(BlurView);
+const StyledAnimatedView = styled(Animated.View);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ConsensusData {
+  localMatch: {
+    patternId: string;
+    label: string;
+    similarity: number;
+    outcome: string;
+  };
+  graphCastPrediction?: {
+    outcome: string;
+    confidence: number;
+    validTime: Date;
+  };
+  vibeSearchResults?: Array<AtmosphericPattern & { similarity: number }>;
+}
+
+export type ConsensusLevel = 'agree' | 'partial' | 'disagree' | 'unknown';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMO Standard Alert Colors (Liquid Glass variants)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ALERT_STYLES: Record<DangerLevel, {
+  bg: string;
+  border: string;
+  text: string;
+  icon: string;
+  blurTint: 'light' | 'dark' | 'default';
+}> = {
   info: {
-    bg: '#1a237e',      // Deep blue
-    border: '#3949ab',
-    text: '#e8eaf6',
+    bg: 'bg-blue-900/80',
+    border: 'border-blue-600',
+    text: 'text-blue-100',
     icon: 'ℹ️',
+    blurTint: 'dark',
   },
   caution: {
-    bg: '#33691e',      // Green (proceeding with caution)
-    border: '#558b2f',
-    text: '#f1f8e9',
+    bg: 'bg-green-900/80',
+    border: 'border-green-600',
+    text: 'text-green-100',
     icon: '⚠️',
+    blurTint: 'dark',
   },
   warning: {
-    bg: '#e65100',      // Amber/Orange (IMO warning)
-    border: '#ff9800',
-    text: '#fff3e0',
+    bg: 'bg-orange-700/80',
+    border: 'border-orange-500',
+    text: 'text-orange-100',
     icon: '⚠️',
+    blurTint: 'dark',
   },
   danger: {
-    bg: '#b71c1c',      // Red (IMO danger)
-    border: '#f44336',
-    text: '#ffebee',
+    bg: 'bg-red-900/80',
+    border: 'border-red-500',
+    text: 'text-red-100',
     icon: '🚨',
+    blurTint: 'dark',
   },
   emergency: {
-    bg: '#4a148c',      // Purple (catastrophic/MAYDAY)
-    border: '#9c27b0',
-    text: '#f3e5f5',
+    bg: 'bg-purple-900/80',
+    border: 'border-purple-500',
+    text: 'text-purple-100',
     icon: '🆘',
+    blurTint: 'dark',
   },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Consensus Utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+function calculateConsensusLevel(consensus?: ConsensusData): ConsensusLevel {
+  if (!consensus?.graphCastPrediction) return 'unknown';
+
+  const localOutcome = consensus.localMatch.outcome.toLowerCase();
+  const gcOutcome = consensus.graphCastPrediction.outcome.toLowerCase();
+
+  // Exact or near-exact match
+  if (localOutcome === gcOutcome ||
+      localOutcome.includes(gcOutcome) ||
+      gcOutcome.includes(localOutcome)) {
+    return 'agree';
+  }
+
+  // Partial agreement (same weather family)
+  const weatherFamilies = [
+    ['gale', 'storm', 'squall', 'wind'],
+    ['rain', 'precipitation', 'shower'],
+    ['wave', 'swell', 'sea'],
+  ];
+
+  for (const family of weatherFamilies) {
+    const localInFamily = family.some(w => localOutcome.includes(w));
+    const gcInFamily = family.some(w => gcOutcome.includes(w));
+    if (localInFamily && gcInFamily) return 'partial';
+  }
+
+  return 'disagree';
+}
+
+const CONSENSUS_STYLES: Record<ConsensusLevel, {
+  bg: string;
+  text: string;
+  label: string;
+  icon: string;
+}> = {
+  agree: {
+    bg: 'bg-green-500/20',
+    text: 'text-green-400',
+    label: 'CONSENSUS',
+    icon: '✓',
+  },
+  partial: {
+    bg: 'bg-amber-500/20',
+    text: 'text-amber-400',
+    label: 'PARTIAL',
+    icon: '≈',
+  },
+  disagree: {
+    bg: 'bg-red-500/20',
+    text: 'text-red-400',
+    label: 'DIVERGENT',
+    icon: '✗',
+  },
+  unknown: {
+    bg: 'bg-gray-500/20',
+    text: 'text-gray-400',
+    label: 'LOCAL ONLY',
+    icon: '?',
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Consensus View Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ConsensusViewProps {
+  consensus: ConsensusData;
+  textColor: string;
+}
+
+const ConsensusView: React.FC<ConsensusViewProps> = ({ consensus, textColor }) => {
+  const level = calculateConsensusLevel(consensus);
+  const style = CONSENSUS_STYLES[level];
+
+  return (
+    <StyledView className="mt-4 rounded-xl overflow-hidden">
+      {/* Glass header */}
+      <StyledView className={`${style.bg} px-4 py-2 flex-row items-center justify-between border-b border-white/10`}>
+        <StyledView className="flex-row items-center">
+          <StyledText className={`${style.text} text-lg mr-2`}>{style.icon}</StyledText>
+          <StyledText className={`${style.text} font-bold text-sm tracking-widest`}>
+            {style.label}
+          </StyledText>
+        </StyledView>
+        {consensus.graphCastPrediction && (
+          <StyledText className="text-white/60 text-xs">
+            GraphCast {Math.round(consensus.graphCastPrediction.confidence * 100)}% conf.
+          </StyledText>
+        )}
+      </StyledView>
+
+      {/* Comparison grid */}
+      <StyledView className="bg-black/30 p-4">
+        <StyledView className="flex-row">
+          {/* Local Pattern Column */}
+          <StyledView className="flex-1 pr-3 border-r border-white/10">
+            <StyledText className="text-white/50 text-xs uppercase tracking-wider mb-2">
+              🧭 Local Pattern
+            </StyledText>
+            <StyledText className={`${textColor} font-semibold text-sm mb-1`}>
+              {consensus.localMatch.label}
+            </StyledText>
+            <StyledText className="text-white/70 text-xs mb-2">
+              {consensus.localMatch.outcome}
+            </StyledText>
+            <StyledView className="bg-white/10 rounded-full px-2 py-1 self-start">
+              <StyledText className="text-white/80 text-xs font-mono">
+                {Math.round(consensus.localMatch.similarity * 100)}% match
+              </StyledText>
+            </StyledView>
+          </StyledView>
+
+          {/* GraphCast Column */}
+          <StyledView className="flex-1 pl-3">
+            <StyledText className="text-white/50 text-xs uppercase tracking-wider mb-2">
+              🌐 GraphCast
+            </StyledText>
+            {consensus.graphCastPrediction ? (
+              <>
+                <StyledText className={`${textColor} font-semibold text-sm mb-1`}>
+                  AI Forecast
+                </StyledText>
+                <StyledText className="text-white/70 text-xs mb-2">
+                  {consensus.graphCastPrediction.outcome}
+                </StyledText>
+                <StyledView className="bg-white/10 rounded-full px-2 py-1 self-start">
+                  <StyledText className="text-white/80 text-xs font-mono">
+                    {Math.round(consensus.graphCastPrediction.confidence * 100)}% conf.
+                  </StyledText>
+                </StyledView>
+              </>
+            ) : (
+              <StyledText className="text-white/40 text-xs italic">
+                No GraphCast data for this region/time
+              </StyledText>
+            )}
+          </StyledView>
+        </StyledView>
+
+        {/* Historical Matches from vibeSearch */}
+        {consensus.vibeSearchResults && consensus.vibeSearchResults.length > 0 && (
+          <StyledView className="mt-4 pt-4 border-t border-white/10">
+            <StyledText className="text-white/50 text-xs uppercase tracking-wider mb-2">
+              📊 Similar Historical Events ({consensus.vibeSearchResults.length})
+            </StyledText>
+            <StyledScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {consensus.vibeSearchResults.slice(0, 5).map((result, idx) => (
+                <StyledView
+                  key={result.id || idx}
+                  className="bg-white/5 rounded-lg p-2 mr-2 min-w-[120px]"
+                >
+                  <StyledText className="text-white/60 text-xs">
+                    {Math.round(result.similarity * 100)}% similar
+                  </StyledText>
+                  <StyledText className="text-white/90 text-xs font-medium mt-1" numberOfLines={2}>
+                    {result.outcome || 'Unknown outcome'}
+                  </StyledText>
+                </StyledView>
+              ))}
+            </StyledScrollView>
+          </StyledView>
+        )}
+      </StyledView>
+    </StyledView>
+  );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,26 +287,28 @@ const ALERT_COLORS: Record<DangerLevel, { bg: string; border: string; text: stri
 
 interface PatternAlertProps {
   alert: PatternAlertType;
+  consensus?: ConsensusData;
   onAcknowledge: (alertId: string) => void;
   onDismiss?: () => void;
   expanded?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Component
+// Pattern Alert Card Component
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const PatternAlertCard: React.FC<PatternAlertProps> = ({
   alert,
+  consensus,
   onAcknowledge,
   onDismiss,
   expanded: initialExpanded = false,
 }) => {
   const [expanded, setExpanded] = useState(initialExpanded);
-  const slideAnim = useState(new Animated.Value(-100))[0];
-  const pulseAnim = useState(new Animated.Value(1))[0];
+  const [slideAnim] = useState(new Animated.Value(-100));
+  const [pulseAnim] = useState(new Animated.Value(1));
 
-  const colors = ALERT_COLORS[alert.level];
+  const style = ALERT_STYLES[alert.level];
 
   // Slide in animation
   useEffect(() => {
@@ -132,12 +353,12 @@ export const PatternAlertCard: React.FC<PatternAlertProps> = ({
     };
   }, [alert.level]);
 
-  const handleAcknowledge = () => {
+  const handleAcknowledge = useCallback(() => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     onAcknowledge(alert.id);
-  };
+  }, [alert.id, onAcknowledge]);
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -147,105 +368,146 @@ export const PatternAlertCard: React.FC<PatternAlertProps> = ({
   const similarityPercent = Math.round(alert.matchedPattern.similarity * 100);
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          backgroundColor: colors.bg,
-          borderColor: colors.border,
-          transform: [
-            { translateY: slideAnim },
-            { scale: pulseAnim },
-          ],
-        },
-      ]}
+    <StyledAnimatedView
+      className="mx-4 my-2 overflow-hidden rounded-2xl"
+      style={{
+        transform: [
+          { translateY: slideAnim },
+          { scale: pulseAnim },
+        ],
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+        elevation: 12,
+      }}
     >
-      {/* Header */}
-      <TouchableOpacity
-        style={styles.header}
-        onPress={() => setExpanded(!expanded)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.headerLeft}>
-          <Text style={styles.icon}>{colors.icon}</Text>
-          <View>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {alert.title}
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.text }]}>
-              {similarityPercent}% pattern match • {formatTime(alert.timestamp)}
-            </Text>
-          </View>
-        </View>
+      {/* Glass background with blur */}
+      <StyledBlur
+        intensity={40}
+        tint={style.blurTint}
+        className="absolute inset-0"
+      />
 
-        <Text style={[styles.expandIcon, { color: colors.text }]}>
-          {expanded ? '▼' : '▶'}
-        </Text>
-      </TouchableOpacity>
+      {/* Color overlay */}
+      <StyledView className={`absolute inset-0 ${style.bg}`} />
 
-      {/* Expanded Content */}
-      {expanded && (
-        <View style={styles.content}>
-          {/* Description */}
-          <Text style={[styles.description, { color: colors.text }]}>
-            {alert.description}
-          </Text>
+      {/* Content container */}
+      <StyledView className={`border-2 ${style.border} rounded-2xl overflow-hidden`}>
+        {/* Header */}
+        <StyledTouchable
+          className="flex-row items-center justify-between p-4"
+          onPress={() => setExpanded(!expanded)}
+          activeOpacity={0.8}
+        >
+          <StyledView className="flex-row items-center flex-1">
+            <StyledText className="text-3xl mr-3">{style.icon}</StyledText>
+            <StyledView className="flex-1">
+              <StyledText className={`${style.text} text-lg font-extrabold tracking-wide`}>
+                {alert.title}
+              </StyledText>
+              <StyledText className={`${style.text} opacity-70 text-xs mt-0.5`}>
+                {similarityPercent}% pattern match • {formatTime(alert.timestamp)}
+              </StyledText>
+            </StyledView>
+          </StyledView>
 
-          {/* Time Estimate */}
-          {alert.estimatedOnset && (
-            <View style={styles.onsetBadge}>
-              <Text style={styles.onsetLabel}>⏱ Estimated Onset</Text>
-              <Text style={styles.onsetValue}>{alert.estimatedOnset}</Text>
-            </View>
-          )}
-
-          {/* Recommendations */}
-          <View style={styles.recommendationsContainer}>
-            <Text style={[styles.recommendationsTitle, { color: colors.text }]}>
-              Recommended Actions:
-            </Text>
-            <ScrollView style={styles.recommendationsList} nestedScrollEnabled>
-              {alert.recommendations.map((rec, index) => (
-                <View key={index} style={styles.recommendationItem}>
-                  <Text style={styles.recommendationNumber}>{index + 1}</Text>
-                  <Text style={[styles.recommendationText, { color: colors.text }]}>
-                    {rec}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Pattern Details */}
-          <View style={styles.patternDetails}>
-            <Text style={[styles.detailsLabel, { color: colors.text }]}>
-              Matched Pattern: {alert.matchedPattern.label || alert.matchedPattern.id}
-            </Text>
-          </View>
-
-          {/* Actions */}
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.acknowledgeButton, { borderColor: colors.border }]}
-              onPress={handleAcknowledge}
-            >
-              <Text style={[styles.acknowledgeText, { color: colors.text }]}>
-                ✓ Acknowledge
-              </Text>
-            </TouchableOpacity>
-
-            {onDismiss && (
-              <TouchableOpacity
-                style={styles.dismissButton}
-                onPress={onDismiss}
-              >
-                <Text style={styles.dismissText}>Dismiss</Text>
-              </TouchableOpacity>
+          <StyledView className="flex-row items-center">
+            {/* Consensus badge in header */}
+            {consensus && (
+              <StyledView className={`${CONSENSUS_STYLES[calculateConsensusLevel(consensus)].bg} px-2 py-1 rounded-full mr-3`}>
+                <StyledText className={`${CONSENSUS_STYLES[calculateConsensusLevel(consensus)].text} text-xs font-bold`}>
+                  {CONSENSUS_STYLES[calculateConsensusLevel(consensus)].icon}
+                </StyledText>
+              </StyledView>
             )}
-          </View>
-        </View>
-      )}
-    </Animated.View>
+            <StyledText className={`${style.text} text-sm`}>
+              {expanded ? '▼' : '▶'}
+            </StyledText>
+          </StyledView>
+        </StyledTouchable>
+
+        {/* Expanded Content */}
+        {expanded && (
+          <StyledView className="px-4 pb-4">
+            {/* Description */}
+            <StyledText className={`${style.text} text-sm leading-5 mb-4`}>
+              {alert.description}
+            </StyledText>
+
+            {/* Time Estimate */}
+            {alert.estimatedOnset && (
+              <StyledView className="bg-black/30 rounded-xl p-3 mb-4 flex-row items-center justify-between">
+                <StyledText className="text-white/80 text-xs font-semibold">
+                  ⏱ Estimated Onset
+                </StyledText>
+                <StyledText className="text-white font-bold text-base">
+                  {alert.estimatedOnset}
+                </StyledText>
+              </StyledView>
+            )}
+
+            {/* Consensus View */}
+            {consensus && (
+              <ConsensusView consensus={consensus} textColor={style.text} />
+            )}
+
+            {/* Recommendations */}
+            <StyledView className="mt-4">
+              <StyledText className={`${style.text} text-xs font-bold uppercase tracking-widest mb-3`}>
+                Recommended Actions
+              </StyledText>
+              <StyledScrollView className="max-h-36" nestedScrollEnabled>
+                {alert.recommendations.map((rec, index) => (
+                  <StyledView key={index} className="flex-row items-start mb-2">
+                    <StyledView className="bg-white/20 w-6 h-6 rounded-full items-center justify-center mr-3">
+                      <StyledText className="text-white text-xs font-bold">
+                        {index + 1}
+                      </StyledText>
+                    </StyledView>
+                    <StyledText className={`${style.text} flex-1 text-sm leading-5`}>
+                      {rec}
+                    </StyledText>
+                  </StyledView>
+                ))}
+              </StyledScrollView>
+            </StyledView>
+
+            {/* Pattern Details */}
+            <StyledView className="mt-4 mb-4 opacity-60">
+              <StyledText className={`${style.text} text-xs italic`}>
+                Matched Pattern: {alert.matchedPattern.label || alert.matchedPattern.id}
+              </StyledText>
+            </StyledView>
+
+            {/* Actions */}
+            <StyledView className="flex-row items-center">
+              <StyledTouchable
+                className={`flex-1 border-2 ${style.border} rounded-xl py-3 items-center`}
+                onPress={handleAcknowledge}
+                activeOpacity={0.7}
+              >
+                <StyledText className={`${style.text} text-sm font-bold uppercase tracking-wider`}>
+                  ✓ Acknowledge
+                </StyledText>
+              </StyledTouchable>
+
+              {onDismiss && (
+                <StyledTouchable
+                  className="ml-3 p-3"
+                  onPress={onDismiss}
+                  activeOpacity={0.7}
+                >
+                  <StyledText className="text-white/50 text-xs">
+                    Dismiss
+                  </StyledText>
+                </StyledTouchable>
+              )}
+            </StyledView>
+          </StyledView>
+        )}
+      </StyledView>
+    </StyledAnimatedView>
   );
 };
 
@@ -255,12 +517,14 @@ export const PatternAlertCard: React.FC<PatternAlertProps> = ({
 
 interface AlertStackProps {
   alerts: PatternAlertType[];
+  consensusMap?: Map<string, ConsensusData>;
   onAcknowledge: (alertId: string) => void;
   maxVisible?: number;
 }
 
 export const PatternAlertStack: React.FC<AlertStackProps> = ({
   alerts,
+  consensusMap,
   onAcknowledge,
   maxVisible = 3,
 }) => {
@@ -270,190 +534,26 @@ export const PatternAlertStack: React.FC<AlertStackProps> = ({
   if (alerts.length === 0) return null;
 
   return (
-    <View style={styles.stackContainer}>
+    <StyledView className="absolute top-16 left-0 right-0 z-50">
       {visibleAlerts.map((alert, index) => (
         <PatternAlertCard
           key={alert.id}
           alert={alert}
+          consensus={consensusMap?.get(alert.id)}
           onAcknowledge={onAcknowledge}
-          expanded={index === 0} // First alert expanded by default
+          expanded={index === 0}
         />
       ))}
 
       {hiddenCount > 0 && (
-        <View style={styles.hiddenCounter}>
-          <Text style={styles.hiddenCounterText}>
+        <StyledView className="self-center bg-black/70 px-4 py-2 rounded-full mt-1">
+          <StyledText className="text-white text-xs font-semibold">
             +{hiddenCount} more alert{hiddenCount > 1 ? 's' : ''}
-          </Text>
-        </View>
+          </StyledText>
+        </StyledView>
       )}
-    </View>
+    </StyledView>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: {
-    borderWidth: 2,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  icon: {
-    fontSize: 28,
-    marginRight: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 12,
-    opacity: 0.8,
-    marginTop: 2,
-  },
-  expandIcon: {
-    fontSize: 14,
-    marginLeft: 8,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  description: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  onsetBadge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  onsetLabel: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  onsetValue: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  recommendationsContainer: {
-    marginBottom: 16,
-  },
-  recommendationsTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  recommendationsList: {
-    maxHeight: 150,
-  },
-  recommendationItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  recommendationNumber: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    color: '#fff',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    textAlign: 'center',
-    lineHeight: 24,
-    fontSize: 12,
-    fontWeight: '700',
-    marginRight: 10,
-  },
-  recommendationText: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  patternDetails: {
-    marginBottom: 16,
-    opacity: 0.7,
-  },
-  detailsLabel: {
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  acknowledgeButton: {
-    borderWidth: 2,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    flex: 1,
-    alignItems: 'center',
-  },
-  acknowledgeText: {
-    fontSize: 14,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  dismissButton: {
-    marginLeft: 12,
-    padding: 12,
-  },
-  dismissText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 12,
-  },
-  stackContainer: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-  },
-  hiddenCounter: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  hiddenCounterText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-});
 
 export default PatternAlertCard;
