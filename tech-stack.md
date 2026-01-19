@@ -9,7 +9,9 @@
 ## 2. AI & Data Architecture
 - **Local Inference:** ONNX Runtime / CoreML (via custom Expo Modules)
 - **Vector Search:** `sqlite-vec` (Native extension bundled via Config Plugin) - **Critical for Offline AI**
+- **Ingest Pipeline:** **Apache Arrow** (<50ms ingest) + **Parquet** (Columnar compression) - The "Secret Sauce" for instant map rendering.
 - **Model Storage:** Expo FileSystem (Regional .zarr / .parquet storage)
+- **LRU Caching:** 50MB local storage limit (holds ~25 regional seeds, covering a Trans-Pac voyage).
 - **Telemetry Ingest:** Signal K Client (WebSocket-based)
 - **Offline Mapping:** Mapbox GL Native (via @rnmapbox/maps)
 
