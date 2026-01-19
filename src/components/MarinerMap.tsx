@@ -18,7 +18,7 @@ import Mapbox, {
   PointAnnotation,
   UserLocation,
 } from '@rnmapbox/maps';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useSQLiteContext } from '../../App';
 import type { FeatureCollection, Point } from 'geojson';
 
 import {
@@ -96,24 +96,22 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
 
   // Fetch "Waze" Social Hazards from local SQLite/vec
   useEffect(() => {
-    if (!isSocialEnabled) {
+    if (!isSocialEnabled || !db) {
         setHazards([]);
         return;
     }
 
     const fetchHazards = async () => {
       try {
-        // Note: In production, you'd use expo-sqlite/vec for vector similarity search
-        // For MVP, we use a simpler bounding box query
         const latDelta = hazardSearchRadiusNm / 60; // 1 degree ≈ 60nm
         const lonDelta = hazardSearchRadiusNm / (60 * Math.cos((vesselLocation.lat * Math.PI) / 180));
 
-        const results = await db.getAllAsync<MarineHazard>(
+        const result = await db.execute(
           `SELECT * FROM marine_hazards
            WHERE lat BETWEEN ? AND ?
            AND lon BETWEEN ? AND ?
-           AND reportedAt > ?
-           ORDER BY reportedAt DESC
+           AND reported_at > ?
+           ORDER BY reported_at DESC
            LIMIT 100`,
           [
             vesselLocation.lat - latDelta,
@@ -124,12 +122,24 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
           ]
         );
 
+        const results = result.rows || [];
+
         // Filter by actual distance (bounding box is approximate)
         const filtered = results.filter(
-          (h) => distanceNM(vesselLocation.lat, vesselLocation.lng, h.lat, h.lon) <= hazardSearchRadiusNm
+          (h: any) => distanceNM(vesselLocation.lat, vesselLocation.lng, h.lat, h.lon) <= hazardSearchRadiusNm
         );
 
-        setHazards(filtered);
+        setHazards(filtered.map((h: any) => ({
+          id: h.id,
+          type: h.type,
+          description: h.description,
+          lat: h.lat,
+          lon: h.lon,
+          reportedAt: h.reported_at,
+          reporterId: h.reporter_id,
+          verified: !!h.verified,
+          confidence: h.confidence,
+        })));
       } catch (error) {
         // Table might not exist yet - that's OK for MVP
         console.log('Hazard fetch skipped:', error);

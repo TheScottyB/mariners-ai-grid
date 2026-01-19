@@ -11,6 +11,8 @@ vi.mock('onnxruntime-react-native', () => ({
     }),
   },
   Tensor: class {
+    dims: any;
+    data: any;
     constructor(type: string, data: any, dims: any) {
       this.dims = dims;
       this.data = data;
@@ -30,6 +32,7 @@ vi.mock('expo-file-system/next', () => {
           modelSource: 'mock',
           modelRunIso: '2026-01-19T00:00:00Z',
           createdAtIso: '2026-01-19T00:00:00Z',
+          boundingBox: { latMin: 0, latMax: 10, lonMin: 0, lonMax: 10 },
           resolutionDeg: 0.25,
           forecastStartIso: '2026-01-19T00:00:00Z',
           forecastEndIso: '2026-01-20T00:00:00Z',

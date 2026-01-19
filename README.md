@@ -16,10 +16,28 @@ We reject the "Cloud-First" orthodoxy of 2026. At sea, the cloud is a myth.
 **Mariner's AI is built to survive offline.**
 
 *   **Embeddings:** Generated *on the boat* via the Slicer/Bridge.
-*   **Storage:** `sqlite-vec` stores vectors *on the iPhone's flash*.
-*   **Search:** Hybrid Queries run *on the Apple A19 chip*.
+*   **Storage:** `op-sqlite` + `vlasky/sqlite-vec` (v0.2.4-alpha) stores vectors locally with synchronous JSI access.
+*   **Search:** Hybrid Queries run *on Apple A13-M5 chips* with zero bridge latency.
 
-This system is **Sovereign** (works if satellites fail), **Private** (data stays on board), and **Fast** (zero latency).
+This system is **Sovereign** (works if satellites fail), **Private** (data stays on board), and **Fast** (zero latency via JSI).
+
+### Hardware Tiers (2026)
+| Device | Role | NPU |
+|--------|------|-----|
+| iPhone 11 (A13) | The Floor | 0.6 TOPS |
+| Pixel 10 (Tensor G5) | Android Standard | 8 TOPS |
+| **iPad Pro (M4/M5)** | **The Chart Table** | **38 TOPS** |
+| MacBook Pro (M5) | The Supercomputer | 40+ TOPS |
+
+*Primary target: iPad Pro "Chart Table" for tactical navigation with sustained thermals and full-screen weather maps.*
+
+### Android-Inclusive Ecosystem (2026)
+| Device | Chipset | Role |
+|--------|---------|------|
+| Pixel 10 / 10 Pro | Tensor G5 | The AI Standard |
+| Galaxy S26 Ultra | Snapdragon 8 Elite | Raw Power |
+| Oppo Find X9 Pro | Dimensity 9500 | Battery Sovereign |
+| Galaxy Tab S11 | Snapdragon 8 Elite | Android Chart Table |
 
 ---
 
@@ -68,7 +86,7 @@ How do we get 10GB of live data to a satellite-connected phone? We don't.
 - **Identity:** "Shadow Auth" - Anonymous device-level identity via `expo-secure-store`.
 - **Maps:** Mapbox GL Native for high-performance offline rendering.
 - **Sensors:** Signal K WebSocket bridge for real-time telemetry.
-- **Vector DB:** Native `sqlite-vec` extension for offline similarity search.
+- **Vector DB:** `op-sqlite` + `vlasky/sqlite-vec` v0.2.4-alpha for zero-latency offline similarity search via synchronous JSI.
 
 ---
 
@@ -76,9 +94,10 @@ How do we get 10GB of live data to a satellite-connected phone? We don't.
 
 ### Prerequisites
 **Device Requirements:**
-- **iOS:** iPhone 11 or newer (A13 Bionic+), iOS 16.0+
-- **Android:** Snapdragon 865+ or equivalent, Android 8.0+ (API 26)
-- **Why?** Edge AI inference requires modern NPU/Neural Engine for acceptable performance
+- **Primary Target:** iPad Pro M4/M5 (38 TOPS NPU, "Chart Table" form factor)
+- **iOS Minimum:** iPhone 11 or newer (A13 Bionic+), iOS 16.0+
+- **Android Minimum:** Pixel 10 (Tensor G5) or Snapdragon 865+, Android 8.0+ (API 26)
+- **Why?** Edge AI inference requires modern NPU/Neural Engine; iPad Pro enables sustained multi-day storm tracking
 
 **Environment Setup:**
 ```bash
@@ -121,6 +140,20 @@ We welcome contributions from meteorologists, AI researchers, and sailors.
 - **Code License:** Apache-2.0.
 
 *Join the grid. Protect the fleet. Navigate with intelligence.*
+
+---
+
+## 📚 Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [Tech Stack](docs/architecture/TECH_STACK.md) | Full technology specification |
+| [Vector DB Decision](docs/architecture/VECTOR_DB_DECISION.md) | Architecture decision record for sqlite-vec |
+| [Agent Guide](docs/development/AGENT_GUIDE.md) | Instructions for AI agents (Claude, Gemini, Warp) |
+| [RC Checklist](docs/development/RC_CHECKLIST.md) | Release candidate validation checklist |
+| [Project Status](docs/release/PROJECT_STATUS.md) | Current implementation status |
+| [App Store Metadata](docs/release/APP_STORE_METADATA.md) | Marketing copy and keywords |
+| [Conductor README](conductor/README.md) | Backend/Slicer documentation |
 
 ---
 *Built with Gemini Conductor & Claude Code.*

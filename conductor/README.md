@@ -89,8 +89,8 @@ Use **EAS Build** (cloud) for heavy compilation:
 
 ## Key Files
 
-### `tech-stack.md`
-"Truth source" for AI agents - prevents hallucinating outdated React Native patterns.
+### `docs/architecture/TECH_STACK.md`
+"Truth source" for AI agents - prevents hallucinating outdated React Native patterns. See also `docs/development/AGENT_GUIDE.md` for agent-specific instructions.
 
 ### `slicer.py`
 Core logic for regional weather extraction. This is where the bandwidth optimization happens.

@@ -46,7 +46,7 @@ async function verify() {
       passedCount++;
       console.log('    Status: ✅ OK\n');
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(`    Status: ❌ FAILED - ${e.message}\n`);
     }
   }

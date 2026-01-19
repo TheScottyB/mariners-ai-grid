@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useSQLiteContext } from '../../App';
 
 import { HazardService, HazardType } from '../services/HazardService';
 import { IdentityService } from '../services/IdentityService';
@@ -144,7 +144,7 @@ export const HazardReportSheet = forwardRef<HazardReportSheetRef, HazardReportSh
     // Handle hazard submission
     const handleReport = useCallback(
       async (option: HazardOption) => {
-        if (isSubmitting || !reportLocation) return;
+        if (isSubmitting || !reportLocation || !db) return;
 
         setIsSubmitting(true);
 

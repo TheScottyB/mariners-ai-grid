@@ -16,16 +16,23 @@
     "test:logic": "vitest run src/services",
     "doctor": "npx expo-doctor"
   },
+  "op-sqlite": {
+    "sqliteVec": true,
+    "performanceMode": true
+  },
   "dependencies": {
     "@bufbuild/protobuf": "^2.10.2",
     "@expo/metro-config": "~54.0.12",
     "@gorhom/bottom-sheet": "^5.2.8",
+    "@op-engineering/op-sqlite": "^11.0.0",
     "@rnmapbox/maps": "^10.2.10",
     "@turf/bbox": "^7.3.2",
     "@types/ws": "^8.18.1",
     "apache-arrow": "^21.1.0",
     "buffer": "^6.0.3",
+    "dotenv": "^17.2.3",
     "expo": "~54.0.31",
+    "expo-background-fetch": "^14.0.9",
     "expo-background-task": "^1.0.10",
     "expo-battery": "~10.0.8",
     "expo-blur": "^15.0.8",
@@ -41,7 +48,6 @@
     "expo-notifications": "~0.32.16",
     "expo-secure-store": "~15.0.8",
     "expo-sensors": "~15.0.8",
-    "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
     "expo-task-manager": "~14.0.9",
     "expo-updates": "^29.0.16",

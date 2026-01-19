@@ -6,7 +6,7 @@
  * - Decay rate for time-sensitive hazards
  */
 
-import type { SQLiteDatabase } from 'expo-sqlite';
+import { DB } from '@op-engineering/op-sqlite';
 import { Barometer, Accelerometer } from 'expo-sensors';
 import { calculateWindSpeed, distanceNM } from '../utils/geoUtils';
 
@@ -79,10 +79,10 @@ const WEATHER_PRESSURE_THRESHOLDS = {
 };
 
 export class HazardService {
-  private db: SQLiteDatabase;
+  private db: DB;
   private deviceId: string;
 
-  constructor(db: SQLiteDatabase, deviceId: string) {
+  constructor(db: DB, deviceId: string) {
     this.db = db;
     this.deviceId = deviceId;
   }
@@ -91,7 +91,7 @@ export class HazardService {
    * Initialize the hazards table schema.
    */
   async initSchema(): Promise<void> {
-    await this.db.execAsync(`
+    await this.db.execute(`
       CREATE TABLE IF NOT EXISTS marine_hazards (
         id TEXT PRIMARY KEY,
         type TEXT NOT NULL,
@@ -110,12 +110,11 @@ export class HazardService {
         last_drift_update INTEGER,
         decay_rate REAL NOT NULL,
         expires_at INTEGER NOT NULL
-      );
+      );`);
 
-      CREATE INDEX IF NOT EXISTS idx_hazards_location ON marine_hazards(lat, lon);
-      CREATE INDEX IF NOT EXISTS idx_hazards_expires ON marine_hazards(expires_at);
-      CREATE INDEX IF NOT EXISTS idx_hazards_type ON marine_hazards(type);
-    `);
+    await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_location ON marine_hazards(lat, lon)');
+    await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_expires ON marine_hazards(expires_at)');
+    await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_type ON marine_hazards(type)');
   }
 
   /**
@@ -212,8 +211,8 @@ export class HazardService {
       expiresAt: now + decayRate * 60 * 60 * 1000 * 2, // Double decay rate for expiry
     };
 
-    await this.db.runAsync(
-      `INSERT INTO marine_hazards (
+    await this.db.execute(
+      `INSERT OR REPLACE INTO marine_hazards (
         id, type, description, lat, lon, reported_at, reporter_id,
         pressure_snapshot, motion_intensity, verified, confidence,
         verification_count, original_lat, original_lon, decay_rate, expires_at
@@ -264,7 +263,7 @@ export class HazardService {
    * Verify an existing hazard (called when another boat confirms it).
    */
   async verifyHazard(hazardId: string): Promise<void> {
-    await this.db.runAsync(
+    await this.db.execute(
       `UPDATE marine_hazards
        SET verification_count = verification_count + 1,
            confidence = MIN(1.0, confidence + 0.15),
@@ -283,32 +282,32 @@ export class HazardService {
     surfaceCurrentV: number, // m/s northward
     hoursElapsed: number
   ): Promise<number> {
-    // Get all drifting hazard types
     const driftingTypes: HazardType[] = ['debris', 'whale', 'fishing_gear'];
     const now = Date.now();
 
-    const hazards = await this.db.getAllAsync<{ id: string; lat: number; lon: number }>(
+    const result = await this.db.execute(
       `SELECT id, lat, lon FROM marine_hazards
        WHERE type IN (${driftingTypes.map(() => '?').join(',')})
        AND expires_at > ?`,
       [...driftingTypes, now]
     );
 
+    const hazards = result.rows || [];
     let updatedCount = 0;
 
     for (const hazard of hazards) {
-      // Convert current velocity to lat/lon drift
-      // Rough approximation: 1 degree lat ≈ 111km, 1 degree lon ≈ 111km * cos(lat)
+      const lat = hazard.lat as number;
+      const lon = hazard.lon as number;
       const metersPerDegLat = 111000;
-      const metersPerDegLon = 111000 * Math.cos((hazard.lat * Math.PI) / 180);
+      const metersPerDegLon = 111000 * Math.cos((lat * Math.PI) / 180);
 
       const driftMetersE = surfaceCurrentU * hoursElapsed * 3600;
       const driftMetersN = surfaceCurrentV * hoursElapsed * 3600;
 
-      const newLon = hazard.lon + driftMetersE / metersPerDegLon;
-      const newLat = hazard.lat + driftMetersN / metersPerDegLat;
+      const newLon = lon + driftMetersE / metersPerDegLon;
+      const newLat = lat + driftMetersN / metersPerDegLat;
 
-      await this.db.runAsync(
+      await this.db.execute(
         `UPDATE marine_hazards SET lat = ?, lon = ?, last_drift_update = ? WHERE id = ?`,
         [newLat, newLon, now, hazard.id]
       );
@@ -330,7 +329,7 @@ export class HazardService {
     const latDelta = radiusNm / 60;
     const lonDelta = radiusNm / (60 * Math.cos((lat * Math.PI) / 180));
 
-    const rows = await this.db.getAllAsync<any>(
+    const result = await this.db.execute(
       `SELECT * FROM marine_hazards
        WHERE lat BETWEEN ? AND ?
        AND lon BETWEEN ? AND ?
@@ -340,9 +339,10 @@ export class HazardService {
       [lat - latDelta, lat + latDelta, lon - lonDelta, lon + lonDelta, now]
     );
 
+    const rows = result.rows || [];
+
     return rows
-      .map((row) => {
-        // Apply time-based confidence decay
+      .map((row: any) => {
         const ageHours = (now - row.reported_at) / (1000 * 60 * 60);
         const decayFactor = Math.pow(0.5, ageHours / row.decay_rate);
         const decayedConfidence = row.confidence * decayFactor;
@@ -368,17 +368,17 @@ export class HazardService {
         } as HazardReport;
       })
       .filter((h) => distanceNM(lat, lon, h.lat, h.lon) <= radiusNm)
-      .filter((h) => h.confidence > 0.1); // Filter out very decayed reports
+      .filter((h) => h.confidence > 0.1);
   }
 
   /**
    * Clean up expired hazards.
    */
   async cleanupExpired(): Promise<number> {
-    const result = await this.db.runAsync(
+    const result = await this.db.execute(
       `DELETE FROM marine_hazards WHERE expires_at < ?`,
       [Date.now()]
     );
-    return result.changes;
+    return result.rowsAffected ?? 0;
   }
 }

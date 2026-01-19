@@ -4,8 +4,11 @@ import { PatternMatcher, TelemetrySnapshot } from '../PatternMatcher';
 import { VecDB } from '../VecDB';
 
 // Mock dependencies
-vi.mock('expo-sqlite', () => ({
-  useSQLiteContext: () => ({}),
+vi.mock('@op-engineering/op-sqlite', () => ({
+  open: vi.fn(() => ({
+    execute: vi.fn(),
+    executeBatch: vi.fn(),
+  })),
 }));
 
 vi.mock('../VecDB', () => {

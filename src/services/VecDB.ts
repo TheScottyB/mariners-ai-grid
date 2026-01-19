@@ -10,7 +10,7 @@
  * atmospheric embeddings.
  */
 
-import type { SQLiteDatabase } from 'expo-sqlite';
+import { open, DB } from '@op-engineering/op-sqlite';
 
 /**
  * Atmospheric state vector - captures weather conditions at a point in time.
@@ -57,13 +57,19 @@ const VECTOR_DIMENSION = 16;
 
 /**
  * VecDB - Vector database service for atmospheric pattern matching
+ * 
+ * Performance: Uses Synchronous JSI (op-sqlite) for zero-latency queries.
  */
 export class VecDB {
-  private db: SQLiteDatabase;
+  private db: DB;
   private initialized: boolean = false;
 
-  constructor(db: SQLiteDatabase) {
-    this.db = db;
+  constructor(dbOrName: DB | string = 'mariners_grid.db') {
+    if (typeof dbOrName === 'string') {
+      this.db = open({ name: dbOrName });
+    } else {
+      this.db = dbOrName;
+    }
   }
 
   /**
@@ -74,50 +80,27 @@ export class VecDB {
     if (this.initialized) return true;
 
     try {
-      // Check if sqlite-vec is available by trying to create a test vector table
-      // The vec_version() function might not be exposed via prepareAsync
+      // Load sqlite-vec extension (handled automatically by op-sqlite if configured, 
+      // but explicit check confirms availability)
       try {
-        await this.db.execAsync(`
-          CREATE VIRTUAL TABLE IF NOT EXISTS _vec_test USING vec0(
-            id TEXT PRIMARY KEY,
-            v float[4]
-          );
-          DROP TABLE _vec_test;
-        `);
-        console.log('[VecDB] sqlite-vec extension loaded successfully');
+        const version = await this.db.execute('SELECT vec_version();');
+        console.log('[VecDB] sqlite-vec Version:', version.rows[0]);
       } catch (vecError: any) {
         console.warn('[VecDB] sqlite-vec extension not loaded:', vecError.message);
         return false;
       }
 
       // Create the atmospheric patterns table with vector column
-      await this.db.execAsync(`
-        -- Main patterns table with metadata
-        CREATE TABLE IF NOT EXISTS atmospheric_patterns (
-          id TEXT PRIMARY KEY,
-          timestamp INTEGER NOT NULL,
-          lat REAL NOT NULL,
-          lon REAL NOT NULL,
-          label TEXT,
-          outcome TEXT,
-          source TEXT NOT NULL,
-          created_at INTEGER DEFAULT (unixepoch())
-        );
-
-        -- Virtual table for vector similarity search
-        CREATE VIRTUAL TABLE IF NOT EXISTS atmospheric_vectors USING vec0(
-          id TEXT PRIMARY KEY,
-          embedding float[${VECTOR_DIMENSION}]
-        );
-
-        -- Index for temporal queries
-        CREATE INDEX IF NOT EXISTS idx_patterns_timestamp
-        ON atmospheric_patterns(timestamp);
-
-        -- Index for geographic filtering
-        CREATE INDEX IF NOT EXISTS idx_patterns_location
-        ON atmospheric_patterns(lat, lon);
-      `);
+      await this.db.executeBatch([
+        // Main patterns table with metadata
+        ['CREATE TABLE IF NOT EXISTS atmospheric_patterns (id TEXT PRIMARY KEY, timestamp INTEGER NOT NULL, lat REAL NOT NULL, lon REAL NOT NULL, label TEXT, outcome TEXT, source TEXT NOT NULL, created_at INTEGER DEFAULT (unixepoch()))'],
+        // Virtual table for vector similarity search
+        [`CREATE VIRTUAL TABLE IF NOT EXISTS atmospheric_vectors USING vec0(id TEXT PRIMARY KEY, embedding float[${VECTOR_DIMENSION}])`],
+        // Index for temporal queries
+        ['CREATE INDEX IF NOT EXISTS idx_patterns_timestamp ON atmospheric_patterns(timestamp)'],
+        // Index for geographic filtering
+        ['CREATE INDEX IF NOT EXISTS idx_patterns_location ON atmospheric_patterns(lat, lon)']
+      ]);
 
       this.initialized = true;
       console.log('[VecDB] Initialized successfully');
@@ -145,9 +128,6 @@ export class VecDB {
     arr[7] = atmo.waveHeight ?? 0;
     arr[8] = atmo.wavePeriod ?? 0;
 
-    // Reserved for future features (indices 9-15)
-    // Could add: visibility, precipitation, swell direction, etc.
-
     return arr;
   }
 
@@ -174,8 +154,8 @@ export class VecDB {
       ? vector
       : this.vectorToFloat32(vector);
 
-    // Insert metadata
-    await this.db.runAsync(
+    // Synchronous execution via JSI
+    await this.db.execute(
       `INSERT OR REPLACE INTO atmospheric_patterns
        (id, timestamp, lat, lon, label, outcome, source)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -191,22 +171,18 @@ export class VecDB {
     );
 
     // Insert vector embedding
-    // sqlite-vec expects the vector as a blob
-    await this.db.runAsync(
-      `INSERT OR REPLACE INTO atmospheric_vectors (id, embedding)
+    // Explicitly delete first to ensure idempotency on virtual table
+    await this.db.execute(`DELETE FROM atmospheric_vectors WHERE id = ?`, [id]);
+    await this.db.execute(
+      `INSERT INTO atmospheric_vectors (id, embedding)
        VALUES (?, vec_f32(?))`,
-      [id, this.float32ToBlob(embedding)]
+      [id, embedding]
     );
   }
 
   /**
    * Find patterns similar to the given atmospheric state.
    * Uses cosine similarity for matching.
-   *
-   * @param query - The atmospheric state to match against
-   * @param limit - Maximum number of results
-   * @param minSimilarity - Minimum similarity threshold (0-1)
-   * @returns Array of matching patterns with similarity scores
    */
   async findSimilar(
     query: AtmosphericVector | Float32Array,
@@ -221,18 +197,7 @@ export class VecDB {
       ? query
       : this.vectorToFloat32(query);
 
-    // Use vec_distance_cosine for similarity search
-    // Lower distance = more similar, so we compute 1 - distance
-    const results = await this.db.getAllAsync<{
-      id: string;
-      distance: number;
-      timestamp: number;
-      lat: number;
-      lon: number;
-      label: string | null;
-      outcome: string | null;
-      source: string;
-    }>(
+    const result = await this.db.execute(
       `SELECT
          v.id,
          vec_distance_cosine(v.embedding, vec_f32(?)) as distance,
@@ -248,35 +213,31 @@ export class VecDB {
        ORDER BY distance ASC
        LIMIT ?`,
       [
-        this.float32ToBlob(embedding),
-        this.float32ToBlob(embedding),
-        1 - minSimilarity, // Convert similarity to distance threshold
+        embedding,
+        embedding,
+        1 - minSimilarity,
         limit,
       ]
     );
 
-    return results.map((row) => ({
+    const rows = result.rows || [];
+
+    return rows.map((row: any) => ({
       id: row.id,
-      vector: new Float32Array(VECTOR_DIMENSION), // We don't return the full vector
+      vector: new Float32Array(VECTOR_DIMENSION),
       timestamp: row.timestamp,
       lat: row.lat,
       lon: row.lon,
       label: row.label ?? undefined,
       outcome: row.outcome ?? undefined,
-      source: row.source as 'graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned',
+      source: row.source as any,
       similarity: 1 - row.distance,
     }));
   }
 
   /**
    * Find patterns similar to query within a geographic bounding box.
-   * Combines spatial filtering with vector similarity.
-   *
-   * THE HYBRID QUERY - Optimized for MVP:
-   * Phase 1: Fast geographic filter using bounding box index
-   * Phase 2: High-dimensional vector similarity using sqlite-vec
-   *
-   * This is the "Does this weather feel like the storm we had in 2024?" query.
+   * Combines spatial filtering with vector similarity (The Hybrid Query).
    */
   async findSimilarNearby(
     query: AtmosphericVector | Float32Array,
@@ -294,20 +255,7 @@ export class VecDB {
       ? query
       : this.vectorToFloat32(query);
 
-    // The Hybrid Query:
-    // 1. WHERE clause uses the idx_patterns_location index for fast geo-filtering
-    // 2. vec_distance_cosine computes similarity on the filtered subset
-    // 3. Results sorted by atmospheric similarity, not geographic distance
-    const results = await this.db.getAllAsync<{
-      id: string;
-      distance: number;
-      timestamp: number;
-      lat: number;
-      lon: number;
-      label: string | null;
-      outcome: string | null;
-      source: string;
-    }>(
+    const result = await this.db.execute(
       `SELECT
          v.id,
          vec_distance_cosine(v.embedding, vec_f32(?)) as distance,
@@ -325,18 +273,20 @@ export class VecDB {
        ORDER BY distance ASC
        LIMIT ?`,
       [
-        this.float32ToBlob(embedding),
+        embedding,
         centerLat - radiusDegrees,
         centerLat + radiusDegrees,
         centerLon - radiusDegrees,
         centerLon + radiusDegrees,
-        this.float32ToBlob(embedding),
-        1 - minSimilarity, // Convert similarity to distance threshold
+        embedding,
+        1 - minSimilarity,
         limit,
       ]
     );
 
-    return results.map((row) => ({
+    const rows = result.rows || [];
+
+    return rows.map((row: any) => ({
       id: row.id,
       vector: new Float32Array(VECTOR_DIMENSION),
       timestamp: row.timestamp,
@@ -344,7 +294,7 @@ export class VecDB {
       lon: row.lon,
       label: row.label ?? undefined,
       outcome: row.outcome ?? undefined,
-      source: row.source as 'graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned',
+      source: row.source as any,
       similarity: 1 - row.distance,
       distanceNm: this.haversineNm(centerLat, centerLon, row.lat, row.lon),
     }));
@@ -352,10 +302,6 @@ export class VecDB {
 
   /**
    * Natural language "vibe search" - find historical weather that felt like this.
-   *
-   * Example: "Does this weather feel like the storm we had in 2024?"
-   *
-   * This is the agentic query that future AI assistants will use.
    */
   async vibeSearch(
     currentConditions: AtmosphericVector,
@@ -363,9 +309,9 @@ export class VecDB {
       lat?: number;
       lon?: number;
       radiusNm?: number;
-      timeRangeMs?: number; // Only search patterns from this time window
-      sourceFilter?: ('graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned')[];
-      outcomeFilter?: string; // Only patterns with this outcome (e.g., "gale")
+      timeRangeMs?: number;
+      sourceFilter?: string[];
+      outcomeFilter?: string;
       limit?: number;
     } = {}
   ): Promise<Array<AtmosphericPattern & {
@@ -388,13 +334,11 @@ export class VecDB {
     } = options;
 
     const embedding = this.vectorToFloat32(currentConditions);
-    const radiusDegrees = radiusNm / 60; // 1 degree ≈ 60nm
+    const radiusDegrees = radiusNm / 60;
 
-    // Build dynamic WHERE clause
     const conditions: string[] = [];
-    const params: any[] = [this.float32ToBlob(embedding)];
+    const params: any[] = [embedding];
 
-    // Geographic filter (if provided)
     if (lat !== undefined && lon !== undefined) {
       conditions.push('p.lat BETWEEN ? AND ?');
       conditions.push('p.lon BETWEEN ? AND ?');
@@ -402,29 +346,23 @@ export class VecDB {
       params.push(lon - radiusDegrees, lon + radiusDegrees);
     }
 
-    // Time filter
     if (timeRangeMs) {
       conditions.push('p.timestamp > ?');
       params.push(Date.now() - timeRangeMs);
     }
 
-    // Source filter
     if (sourceFilter && sourceFilter.length > 0) {
       conditions.push(`p.source IN (${sourceFilter.map(() => '?').join(', ')})`);
       params.push(...sourceFilter);
     }
 
-    // Outcome filter
     if (outcomeFilter) {
       conditions.push('p.outcome LIKE ?');
       params.push(`%${outcomeFilter}%`);
     }
 
-    const whereClause = conditions.length > 0
-      ? `WHERE ${conditions.join(' AND ')}`
-      : '';
-
-    params.push(limit);
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    params.push(embedding, limit);
 
     const query = `
       SELECT
@@ -443,23 +381,12 @@ export class VecDB {
       LIMIT ?
     `;
 
-    // Reorder params: embedding first, then WHERE params, then LIMIT
-    const orderedParams = [params[0], ...params.slice(1, -1), params[params.length - 1]];
-
-    const results = await this.db.getAllAsync<{
-      id: string;
-      distance: number;
-      timestamp: number;
-      lat: number;
-      lon: number;
-      label: string | null;
-      outcome: string | null;
-      source: string;
-    }>(query, orderedParams);
-
+    // Note: op-sqlite handles the param ordering in execute
+    const result = await this.db.execute(query, params);
+    const rows = result.rows || [];
     const now = Date.now();
 
-    return results.map((row) => ({
+    return rows.map((row: any) => ({
       id: row.id,
       vector: new Float32Array(VECTOR_DIMENSION),
       timestamp: row.timestamp,
@@ -467,7 +394,7 @@ export class VecDB {
       lon: row.lon,
       label: row.label ?? undefined,
       outcome: row.outcome ?? undefined,
-      source: row.source as 'graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned',
+      source: row.source as any,
       similarity: 1 - row.distance,
       distanceNm: lat !== undefined && lon !== undefined
         ? this.haversineNm(lat, lon, row.lat, row.lon)
@@ -478,17 +405,14 @@ export class VecDB {
 
   /**
    * Predict likely outcome based on similar historical patterns.
-   * Returns the most common outcome among similar patterns.
    */
   async predictOutcome(
     query: AtmosphericVector,
     limit: number = 5
   ): Promise<{ outcome: string; confidence: number; matchCount: number } | null> {
     const similar = await this.findSimilar(query, limit, 0.75);
-
     if (similar.length === 0) return null;
 
-    // Count outcomes
     const outcomeCounts = new Map<string, number>();
     let totalWithOutcome = 0;
 
@@ -502,7 +426,6 @@ export class VecDB {
 
     if (totalWithOutcome === 0) return null;
 
-    // Find most common outcome
     let bestOutcome = '';
     let bestCount = 0;
 
@@ -522,46 +445,39 @@ export class VecDB {
 
   /**
    * Import historical patterns from GraphCast forecast data.
-   * Used to seed the database with known weather scenarios.
    */
   async importFromForecast(
     forecastGrid: Array<{
       lat: number;
       lon: number;
       timestamp: number;
-      t2m: number;        // 2m temperature
-      msl: number;        // Mean sea level pressure
-      u10: number;        // 10m U wind
-      v10: number;        // 10m V wind
+      t2m: number;
+      msl: number;
+      u10: number;
+      v10: number;
     }>,
     source: 'graphcast' | 'historical' = 'graphcast'
   ): Promise<number> {
     let imported = 0;
-
     for (const point of forecastGrid) {
       const id = `${source}_${point.timestamp}_${point.lat.toFixed(2)}_${point.lon.toFixed(2)}`;
-
-      // Normalize values to [-1, 1] range
       const vector: AtmosphericVector = {
         temperature: this.normalizeTemp(point.t2m),
         pressure: this.normalizePressure(point.msl),
-        humidity: 0.5, // Default if not provided
+        humidity: 0.5,
         windU: this.normalizeWind(point.u10),
         windV: this.normalizeWind(point.v10),
-        pressureTrend: 0, // Would need time series to compute
-        cloudCover: 0.5, // Default if not provided
+        pressureTrend: 0,
+        cloudCover: 0.5,
       };
-
       await this.storePattern(id, vector, {
         timestamp: point.timestamp,
         lat: point.lat,
         lon: point.lon,
         source,
       });
-
       imported++;
     }
-
     return imported;
   }
 
@@ -574,75 +490,42 @@ export class VecDB {
     oldestTimestamp: number;
     newestTimestamp: number;
   }> {
-    const total = await this.db.getFirstAsync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM atmospheric_patterns'
-    );
+    const total = await this.db.execute('SELECT COUNT(*) as count FROM atmospheric_patterns');
+    const bySource = await this.db.execute('SELECT source, COUNT(*) as count FROM atmospheric_patterns GROUP BY source');
+    const timeRange = await this.db.execute('SELECT MIN(timestamp) as oldest, MAX(timestamp) as newest FROM atmospheric_patterns');
 
-    const bySource = await this.db.getAllAsync<{ source: string; count: number }>(
-      'SELECT source, COUNT(*) as count FROM atmospheric_patterns GROUP BY source'
-    );
-
-    const timeRange = await this.db.getFirstAsync<{ oldest: number; newest: number }>(
-      'SELECT MIN(timestamp) as oldest, MAX(timestamp) as newest FROM atmospheric_patterns'
-    );
+    const totalCount = (total.rows?.[0]?.count as number) ?? 0;
+    const sourceRows = bySource.rows || [];
+    const rangeRow = timeRange.rows?.[0] as any;
 
     return {
-      totalPatterns: total?.count ?? 0,
-      bySource: Object.fromEntries(bySource.map((r) => [r.source, r.count])),
-      oldestTimestamp: timeRange?.oldest ?? 0,
-      newestTimestamp: timeRange?.newest ?? 0,
+      totalPatterns: totalCount,
+      bySource: Object.fromEntries(sourceRows.map((r: any) => [r.source, r.count as number])),
+      oldestTimestamp: (rangeRow?.oldest as number) ?? 0,
+      newestTimestamp: (rangeRow?.newest as number) ?? 0,
     };
   }
 
-  // ─────────────────────────────────────────────────────────────────────
   // Private helpers
-  // ─────────────────────────────────────────────────────────────────────
-
-  /**
-   * Convert Float32Array to Blob for sqlite-vec
-   */
-  private float32ToBlob(arr: Float32Array): Uint8Array {
-    return new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
-  }
-
-  /**
-   * Normalize temperature (Kelvin) to [-1, 1]
-   * Assumes range 223K (-50°C) to 323K (50°C)
-   */
   private normalizeTemp(kelvin: number): number {
     const celsius = kelvin - 273.15;
     return Math.max(-1, Math.min(1, celsius / 50));
   }
 
-  /**
-   * Normalize pressure (Pa) to [-1, 1]
-   * Assumes range 97000 Pa (low) to 103000 Pa (high)
-   */
   private normalizePressure(pa: number): number {
     const hPa = pa / 100;
     return Math.max(-1, Math.min(1, (hPa - 1000) / 30));
   }
 
-  /**
-   * Normalize wind component (m/s) to [-1, 1]
-   * Assumes max wind of 40 m/s (~78 knots)
-   */
   private normalizeWind(ms: number): number {
     return Math.max(-1, Math.min(1, ms / 40));
   }
 
-  /**
-   * Calculate distance between two points in nautical miles.
-   * Uses Haversine formula for accuracy on spherical Earth.
-   */
   private haversineNm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 3440.065; // Earth radius in nautical miles
+    const R = 3440.065;
     const dLat = this.toRad(lat2 - lat1);
     const dLon = this.toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }

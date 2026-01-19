@@ -94,7 +94,6 @@ export default ({ config }) => {
     plugins: [
       "expo-dev-client",
       "expo-location",
-      "expo-sqlite",
       [
         "expo-build-properties",
         {
@@ -114,13 +113,10 @@ export default ({ config }) => {
           RNMapboxMapsVersion: "11.16.2"
         }
       ],
-      [
-        "./plugins/with-sqlite-vec/withSqliteVec.js",
-        {
-          version: "0.1.6",
-          debug: IS_DEV
-        }
-      ]
+      // Mariner Zero Latency: Apple Silicon optimizations for op-sqlite + sqlite-vec
+      // Injects -O3, -ffast-math, -mfpu=neon flags for A13-A19/M4/M5 hardware
+      "./plugins/withMarinerOptimizations"
+      // NOTE: sqlite-vec base config is in package.json: "op-sqlite": { "sqliteVec": true }
     ],
     extra: {
       eas: {

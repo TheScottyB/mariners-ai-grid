@@ -1,11 +1,10 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState, useRef, useCallback } from 'react';
-import * as SQLite from 'expo-sqlite';
+import { useEffect, useState, useRef, useCallback, createContext, useContext } from 'react';
+import { open, DB } from '@op-engineering/op-sqlite';
 import { IdentityService, MarinerIdentity } from './src/services/IdentityService';
 import { SignalKBridge } from './src/services/SignalKBridge';
-import { SeedReader } from './src/services/SeedReader';
 import { windDataToGeoJSON } from './src/utils/geoUtils';
 import MarinerMap, { VesselLocation } from './src/components/MarinerMap';
 import { HazardReportingModal } from './src/components/HazardReportingModal';
@@ -15,12 +14,15 @@ import { PatternMatcher, PatternAlert as PatternAlertType, TelemetrySnapshot } f
 import { VecDB } from './src/services/VecDB';
 import { VesselSnapshot } from './src/services/VesselSnapshot';
 import { GridSync } from './src/services/GridSync';
-import { MarineHazard } from './src/utils/geoUtils';
+import { HazardService } from './src/services/HazardService';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
-import { loadVecExtension } from './modules/expo-sqlite-vec-loader';
 import type { FeatureCollection, Point } from 'geojson';
 
 import { RemoteConfig } from './src/services/RemoteConfig';
+
+// Compatibility context for components using useSQLiteContext
+export const SQLiteContext = createContext<DB | null>(null);
+export const useSQLiteContext = () => useContext(SQLiteContext);
 
 export default function App() {
   const [identity, setIdentity] = useState<MarinerIdentity | null>(null);
@@ -51,7 +53,7 @@ export default function App() {
   const vecDbRef = useRef<VecDB | null>(null);
   const vesselSnapshotRef = useRef<VesselSnapshot | null>(null);
   const gridSyncRef = useRef<GridSync | null>(null);
-  const dbRef = useRef<SQLite.SQLiteDatabase | null>(null);
+  const dbRef = useRef<DB | null>(null);
   const lastTelemetryRef = useRef<TelemetrySnapshot | null>(null);
 
   // Weather Seed Manager
@@ -64,18 +66,13 @@ export default function App() {
       // 0. Initialize Remote Config
       await RemoteConfig.getInstance().initialize();
 
-      // 1. Register sqlite-vec auto-extension BEFORE opening database
-      console.log('[App] Registering sqlite-vec auto-extension...');
-      const vecLoaded = await loadVecExtension('mariners_grid.db');
-      if (!vecLoaded) {
-        console.warn('[App] sqlite-vec extension registration failed - vector search unavailable');
-      }
-
-      // 2. Initialize SQLite Database (auto-extension will load for this connection)
-      const db = await SQLite.openDatabaseAsync('mariners_grid.db');
+      // 1. Initialize op-sqlite (Synchronous JSI)
+      // Extension loading is handled automatically via package.json config
+      console.log('[App] Initializing op-sqlite (Zero Latency)...');
+      const db = open({ name: 'mariners_grid.db' });
       dbRef.current = db;
 
-      // 3. Initialize VecDB
+      // 2. Initialize VecDB
       const vecDb = new VecDB(db);
       await vecDb.initialize().catch(e => console.warn('[App] VecDB init failed:', e));
       vecDbRef.current = vecDb;
@@ -85,6 +82,10 @@ export default function App() {
       await vesselSnapshot.initialize().catch(e => console.warn('[App] VesselSnapshot init failed:', e));
       vesselSnapshotRef.current = vesselSnapshot;
 
+      // Initialize HazardService and create schema
+      const hazardService = new HazardService(db, identity?.deviceId || 'unknown');
+      await hazardService.initSchema().catch(e => console.warn('[App] HazardService init failed:', e));
+
       // Initialize GridSync
       const gridSync = new GridSync(db, vesselSnapshot, vecDb);
       await gridSync.initialize().catch(e => console.warn('[App] GridSync init failed:', e));
@@ -93,7 +94,6 @@ export default function App() {
 
       // Connect Signal K (Mock simulation by default in bridge)
       skBridge.current.connect((delta) => {
-        // Handle basic vessel tracking from Signal K updates
         if (delta.updates) {
           delta.updates.forEach((update: any) => {
             update.values.forEach((val: any) => {
@@ -152,12 +152,10 @@ export default function App() {
 
   useEffect(() => {
     async function checkFirstWatch() {
-      // 1. Initialize Identity
       const idService = IdentityService.getInstance();
       const user = await idService.getOrInitializeIdentity();
       setIdentity(user);
 
-      // 2. Check Onboarding Status
       const complete = await isOnboardingComplete();
       if (!complete) {
         setShowOnboarding(true);
@@ -206,7 +204,7 @@ export default function App() {
   }
 
   return (
-    <SQLite.SQLiteProvider databaseName="mariners_grid.db" useSuspense={false}>
+    <SQLiteContext.Provider value={dbRef.current}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>MARINER'S AI</Text>
@@ -245,7 +243,7 @@ export default function App() {
 
         <StatusBar style="light" />
       </SafeAreaView>
-    </SQLite.SQLiteProvider>
+    </SQLiteContext.Provider>
   );
 }
 

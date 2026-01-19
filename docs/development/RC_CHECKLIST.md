@@ -28,7 +28,7 @@
 ## 🚀 Deployment & Support Readiness
 
 - [ ] **Feature Flags:** Verify "Night Watch" and "Social Reporting" are flagged for remote toggle.
-- [ ] **Rollback Strategy:** Document `eas update --rollback` procedure for `sqlite-vec` issues.
+- [ ] **Rollback Strategy:** Document `eas update --rollback` procedure for `op-sqlite` + `vlasky/sqlite-vec` v0.2.4-alpha issues.
 - [ ] **Analytics:** Confirm "First Watch Complete" event fires in EAS Dashboard.
 
 ---

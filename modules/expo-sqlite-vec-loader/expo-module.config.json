@@ -1,9 +1,0 @@
-{
-  "platforms": ["ios", "android"],
-  "ios": {
-    "modules": ["ExpoSqliteVecLoaderModule"]
-  },
-  "android": {
-    "modules": ["expo.modules.sqlitevecloader.ExpoSqliteVecLoaderModule"]
-  }
-}

@@ -14,7 +14,7 @@
  */
 
 import { VecDB, AtmosphericVector, AtmosphericPattern } from './VecDB';
-import type { SQLiteDatabase } from 'expo-sqlite';
+import { DB } from '@op-engineering/op-sqlite';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -281,7 +281,7 @@ export class PatternMatcher {
   private telemetryBuffer: TelemetrySnapshot[] = [];
   private readonly BUFFER_SIZE = 60; // Keep last 60 readings for trend analysis
 
-  constructor(db: SQLiteDatabase, config?: Partial<PatternMatcherConfig>) {
+  constructor(db: DB, config?: Partial<PatternMatcherConfig>) {
     this.vecDB = new VecDB(db);
     this.config = {
       checkIntervalMs: 30000, // Check every 30 seconds
