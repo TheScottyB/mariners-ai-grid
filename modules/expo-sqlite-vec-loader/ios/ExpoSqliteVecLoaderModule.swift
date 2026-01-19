@@ -35,59 +35,49 @@ public class ExpoSqliteVecLoaderModule: Module {
   }
 
   /**
-   * Load the sqlite-vec extension into the specified database.
+   * Load the sqlite-vec extension as an auto-extension.
    * 
-   * Since sqlite-vec is statically linked, we call the init function directly
-   * on the opened database connection.
+   * This registers sqlite-vec to be automatically loaded for ALL
+   * future database connections, including Expo SQLite's connections.
    * 
    * Returns true if successful, false otherwise.
    */
   private func loadSqliteVecExtension(databaseName: String) async -> Bool {
-    NSLog("[ExpoSqliteVecLoader] Attempting to load sqlite-vec for database: \(databaseName)")
+    NSLog("[ExpoSqliteVecLoader] Registering sqlite-vec as auto-extension")
     
-    // Get the database file path
-    guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-      NSLog("[ExpoSqliteVecLoader] ERROR: Could not find documents directory")
-      return false
+    // Define the auto-extension entry point
+    // This closure will be called for every new database connection
+    let autoExtension: @convention(c) (OpaquePointer?, UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>?, UnsafePointer<sqlite3_api_routines>?) -> Int32 = { db, pzErrMsg, pApi in
+      // Call the statically linked sqlite3_vec_init
+      return sqlite3_vec_init(db, pzErrMsg, pApi)
     }
     
-    let dbPath = documentsPath.appendingPathComponent("SQLite/\(databaseName)").path
-    NSLog("[ExpoSqliteVecLoader] Database path: \(dbPath)")
-    
-    // Open database connection
-    var db: OpaquePointer?
-    if sqlite3_open(dbPath, &db) != SQLITE_OK {
-      NSLog("[ExpoSqliteVecLoader] ERROR: Could not open database at \(dbPath)")
-      return false
-    }
-    
-    defer {
-      sqlite3_close(db)
-    }
-    
-    // Call the statically linked sqlite3_vec_init function directly
-    var errorMsg: UnsafeMutablePointer<Int8>? = nil
-    let result = sqlite3_vec_init(db, &errorMsg, nil)
+    // Register the auto-extension
+    let result = sqlite3_auto_extension(unsafeBitCast(autoExtension, to: (@convention(c) () -> Void).self))
     
     if result != SQLITE_OK {
-      let error = errorMsg != nil ? String(cString: errorMsg!) : "Unknown error"
-      NSLog("[ExpoSqliteVecLoader] ERROR: Failed to initialize extension: \(error)")
-      if errorMsg != nil {
-        sqlite3_free(errorMsg)
-      }
+      NSLog("[ExpoSqliteVecLoader] ERROR: Failed to register auto-extension")
       return false
     }
     
-    NSLog("[ExpoSqliteVecLoader] ✅ Successfully loaded sqlite-vec extension")
+    NSLog("[ExpoSqliteVecLoader] ✅ Auto-extension registered successfully")
     
-    // Test the extension
-    var stmt: OpaquePointer?
-    if sqlite3_prepare_v2(db, "SELECT vec_version()", -1, &stmt, nil) == SQLITE_OK {
-      if sqlite3_step(stmt) == SQLITE_ROW {
-        let version = String(cString: sqlite3_column_text(stmt, 0))
-        NSLog("[ExpoSqliteVecLoader] vec_version: \(version)")
+    // Test by opening a temporary connection
+    var db: OpaquePointer?
+    if sqlite3_open(":memory:", &db) == SQLITE_OK {
+      defer { sqlite3_close(db) }
+      
+      // The auto-extension should have loaded automatically
+      var stmt: OpaquePointer?
+      if sqlite3_prepare_v2(db, "SELECT vec_version()", -1, &stmt, nil) == SQLITE_OK {
+        if sqlite3_step(stmt) == SQLITE_ROW {
+          let version = String(cString: sqlite3_column_text(stmt, 0))
+          NSLog("[ExpoSqliteVecLoader] ✅ Verified vec_version: \(version)")
+        }
+        sqlite3_finalize(stmt)
+      } else {
+        NSLog("[ExpoSqliteVecLoader] WARNING: vec_version() not available - extension may not have loaded")
       }
-      sqlite3_finalize(stmt)
     }
     
     return true

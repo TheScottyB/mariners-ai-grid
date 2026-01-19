@@ -64,16 +64,16 @@ export default function App() {
       // 0. Initialize Remote Config
       await RemoteConfig.getInstance().initialize();
 
-      // 1. Initialize SQLite Database
-      const db = await SQLite.openDatabaseAsync('mariners_grid.db');
-      dbRef.current = db;
-
-      // 2. Load sqlite-vec extension
-      console.log('[App] Loading sqlite-vec extension...');
+      // 1. Register sqlite-vec auto-extension BEFORE opening database
+      console.log('[App] Registering sqlite-vec auto-extension...');
       const vecLoaded = await loadVecExtension('mariners_grid.db');
       if (!vecLoaded) {
-        console.warn('[App] sqlite-vec extension failed to load - vector search unavailable');
+        console.warn('[App] sqlite-vec extension registration failed - vector search unavailable');
       }
+
+      // 2. Initialize SQLite Database (auto-extension will load for this connection)
+      const db = await SQLite.openDatabaseAsync('mariners_grid.db');
+      dbRef.current = db;
 
       // 3. Initialize VecDB
       const vecDb = new VecDB(db);
