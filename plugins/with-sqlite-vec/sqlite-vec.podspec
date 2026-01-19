@@ -13,8 +13,9 @@ Pod::Spec.new do |s|
 
   # Use pre-compiled static library (avoids expo-sqlite symbol prefix conflicts)
   s.vendored_libraries = 'vendor/ios/libsqlite_vec.a'
+  s.preserve_paths = 'vendor/ios/libsqlite_vec.a'
 
-  # Link C++ standard library
+  # Ensure library is loaded - use static frameworks for proper linking
+  s.static_framework = true
   s.library = 'c++'
-  s.xcconfig = { 'OTHER_LDFLAGS' => '-force_load "$(PODS_TARGET_SRCROOT)/vendor/ios/libsqlite_vec.a"' }
 end
