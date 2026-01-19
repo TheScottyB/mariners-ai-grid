@@ -40,37 +40,22 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
           variables: str, output_format: str, output: Path, offline: bool):
     """Extract a regional weather slice."""
     from slicer.core import BoundingBox, ECMWFHRESSlicer
-    from slicer.export import SeedExporter
+    from slicer.aifs import AIFSSlicer
+    from slicer.export import SeedExporter, compare_formats
     from slicer.variables import MINIMAL_VARIABLES, STANDARD_VARIABLES, FULL_VARIABLES
 
-    title = "Mariner's AI Grid - Weather Slicer\n"
-    title += f"Extracting {radius}nm radius around ({lat:.2f}, {lon:.2f})"
-    console.print(Panel.fit(title, border_style="blue"))
+    # ... (title logic)
 
-    bbox = BoundingBox.from_center(lat, lon, radius)
-
-    region = f"{bbox.lat_min:.2f} to {bbox.lat_max:.2f}N, "
-    region += f"{bbox.lon_min:.2f} to {bbox.lon_max:.2f}E"
-    console.print("\n[dim]Region:[/]")
-    console.print(region)
-    
-    cov_str = f"{bbox.area_sq_nm:,.0f}"
-    console.print(f"[dim]Coverage:[/]{cov_str} sq nm")
-
-    var_map = {
-        "minimal": MINIMAL_VARIABLES,
-        "standard": STANDARD_VARIABLES,
-        "full": FULL_VARIABLES,
-    }
-    var_list = var_map.get(variables, STANDARD_VARIABLES)
-
-    console.print(f"[dim]Variables:[/]{len(var_list)} ({variables})")
-    console.print(f"[dim]Forecast:[/]{hours}h at {step}h intervals")
-
-    slicer = ECMWFHRESSlicer(
-        cache_dir=output / ".cache",
-        offline_mode=offline,
-    )
+    # Initialize slicer
+    if offline:
+        slicer = ECMWFHRESSlicer(
+            cache_dir=output / ".cache",
+            offline_mode=True,
+        )
+    else:
+        slicer = AIFSSlicer(
+            cache_dir=output / ".cache",
+        )
 
     with Progress(
         SpinnerColumn(),
@@ -82,12 +67,20 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
             total=None
         )
 
-        seed = slicer.slice(
-            bbox=bbox,
-            forecast_hours=hours,
-            time_step_hours=step,
-            variables=var_list,
-        )
+        if offline:
+            seed = slicer.slice(
+                bbox=bbox,
+                forecast_hours=hours,
+                time_step_hours=step,
+                variables=var_list,
+            )
+        else:
+            # AIFSSlicer has slightly different signature (auto-manages variables for GraphCast)
+            seed = slicer.slice(
+                bbox=bbox,
+                forecast_hours=hours,
+                time_step_hours=step,
+            )
 
         progress.update(task, completed=True)
 

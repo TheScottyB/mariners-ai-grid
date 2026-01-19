@@ -58,64 +58,37 @@ class AIFSSlicer:
         )
         logger.info(f"Buffered BBox: {buffered_bbox} (Original: {bbox})")
 
-        # 2. Determine Time Steps (Autoregressive State)
-        # We need T0 and T-6h. 
-        # Strategy: Fetch latest run (00Z/12Z). 
-        # For 'Seed', we typically want the ANALYSIS (0h) and the PREVIOUS run's forecast for -6h?
-        # Simpler MVP: Fetch 0h and 6h from CURRENT run, and let the boat infer from 6h onwards.
-        # OR: Fetch 0h from current, and assume boat has previous.
-        # ROBUST STRATEGY: Fetch 0h, 6h, 12h... from current run.
-        # GraphCast on boat will start inference from T=6 using (T0, T6) as inputs? 
-        # Actually, standard GraphCast needs (T-1, T0) to predict T1.
-        # If we provide (0h, 6h) from AIFS, the boat can predict 12h.
-        # So we just need to ensure we provide at least first 2 steps.
-        
         steps = list(range(0, forecast_hours + 1, time_step_hours))
         
-        # 3. Fetch Data
-        # AIFS Open Data provides specific params.
-        # We need surface + pressure levels.
+        # 3. Fetch Data with Fallback
+        # Try today's 00Z run (date=0, time=0). If not available, try yesterday's 12Z (date=-1, time=12).
         
         # Surface
-        sfc_params = ["msl", "10u", "10v", "2t"] # Basic set available in AIFS
+        sfc_params = ["msl", "10u", "10v", "2t"] 
         target_sfc = self.cache_dir / "aifs_sfc.grib2"
         
-        logger.info("Fetching AIFS Surface data...")
-        self.client.retrieve(
-            date=0,      # Latest
-            time=0,      # 00Z or 12Z auto-selection? client defaults to latest? 
-            # ecmwf-opendata requires explicit time usually, or use '0' for 00Z?
-            # Safe bet: use date=-1 (yesterday) if today 00Z not ready? 
-            # Let's rely on default 'latest' behavior if possible or specify 0/12.
-            # actually ecmwf-opendata 'date=0' means today.
-            step=steps,
-            type="fc",
-            param=sfc_params,
-            target=str(target_sfc)
-        )
-        
-        # Upper Air (Pressure Levels)
-        # AIFS usually has 50, 100, 250, 500, 850, 1000 hPa
+        # Upper Air
         pl_params = ["z", "q", "t", "u", "v"] 
-        levels = [1000, 850, 500] # Minimal set for MVP
+        levels = [1000, 850, 500] 
         target_pl = self.cache_dir / "aifs_pl.grib2"
         
-        logger.info("Fetching AIFS Upper Air data...")
-        self.client.retrieve(
-            date=0,
-            step=steps,
-            type="fc",
-            levtype="pl",
-            levelist=levels,
-            param=pl_params,
-            target=str(target_pl)
-        )
-        
+        try:
+            logger.info("Attempting to fetch latest AIFS run (00Z)...")
+            self._fetch_files(date=0, time=0, steps=steps, sfc_params=sfc_params, pl_params=pl_params, levels=levels, target_sfc=target_sfc, target_pl=target_pl)
+            model_run_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        except Exception as e:
+            logger.warning(f"00Z run not available: {e}. Falling back to previous 12Z...")
+            try:
+                self._fetch_files(date=-1, time=12, steps=steps, sfc_params=sfc_params, pl_params=pl_params, levels=levels, target_sfc=target_sfc, target_pl=target_pl)
+                model_run_date = (datetime.now(timezone.utc) - timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0)
+            except Exception as e2:
+                logger.error(f"Fallback failed: {e2}")
+                raise RuntimeError("Could not fetch AIFS data from ECMWF Open Data.") from e2
+
         # 4. Merge and Crop (Slicing)
         ds_sfc = xr.open_dataset(target_sfc, engine="cfgrib")
         ds_pl = xr.open_dataset(target_pl, engine="cfgrib")
         
-        # Rename vars to CF compliant if needed (cfgrib does some)
         # Merge
         ds = xr.merge([ds_sfc, ds_pl])
         
@@ -127,18 +100,17 @@ class AIFSSlicer:
         )
         
         # 5. Create WeatherSeed
-        # Convert xarray to dict of numpy arrays
         variables = {}
         for var_name in ds_sliced.data_vars:
             variables[var_name] = ds_sliced[var_name].values.astype(np.float32)
             
-        times = [datetime.now(timezone.utc) + timedelta(hours=h) for h in steps] # Approx
+        times = [model_run_date + timedelta(hours=h) for h in steps]
         
         return WeatherSeed(
-            seed_id=f"aifs_seed_{datetime.now().strftime('%Y%m%d%H')}",
+            seed_id=f"aifs_seed_{model_run_date.strftime('%Y%m%d%H')}",
             created_at=datetime.now(timezone.utc),
             model_source="ecmwf_aifs_open",
-            model_run=datetime.now(timezone.utc), # Placeholder
+            model_run=model_run_date,
             bounding_box=buffered_bbox,
             resolution_deg=self.RESOLUTION,
             forecast_start=times[0],
@@ -148,5 +120,27 @@ class AIFSSlicer:
             latitudes=ds_sliced.latitude.values,
             longitudes=ds_sliced.longitude.values,
             times=times,
-            metadata={"buffered": True, "buffer_deg": BUFFER_DEG}
+            metadata={"buffered": "true", "buffer_deg": str(BUFFER_DEG)}
+        )
+
+    def _fetch_files(self, date, time, steps, sfc_params, pl_params, levels, target_sfc, target_pl):
+        # Surface
+        self.client.retrieve(
+            date=date,
+            time=time,
+            step=steps,
+            type="fc",
+            param=sfc_params,
+            target=str(target_sfc)
+        )
+        # Upper Air
+        self.client.retrieve(
+            date=date,
+            time=time,
+            step=steps,
+            type="fc",
+            levtype="pl",
+            levelist=levels,
+            param=pl_params,
+            target=str(target_pl)
         )
