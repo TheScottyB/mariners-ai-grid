@@ -7,7 +7,7 @@
 
 **Traditional weather models are blind to the surface. Mariner’s AI changes the game.**
 
-Mariner’s AI Grid is an open-source, agentic weather platform built for the deep-water community. By running Google’s GraphCast AI directly on your device’s NPU, we deliver 10-day global forecasts that are faster, more accurate, and 95% more data-efficient than traditional GRIB downloads.
+Mariner’s AI Grid is an open-source, agentic weather platform built for the **blue-water** community. By running Google’s GraphCast AI directly on your device’s NPU, we deliver 10-day global forecasts that are faster, more accurate, and 95% more data-efficient than traditional GRIB downloads.
 
 ---
 
@@ -38,7 +38,7 @@ Offshore sailors face a dangerous reality:
 ---
 
 ## 📊 The "Pacific Seed" Audit
-Our "San Francisco to Hawaii" midpoint test confirms the **Maverick** architecture is perfectly tuned for the deep-water reality.
+Our "San Francisco to Hawaii" midpoint test confirms the **Maverick** architecture is perfectly tuned for the **blue-water** reality.
 
 *   **Parquet Victory:** Discovered that **Parquet (2.1 MB)** outperforms Protobuf (2.5 MB) for gridded weather data due to superior dictionary encoding of repeated values.
 *   **Quantization Refinements:**
@@ -74,6 +74,13 @@ How do we get 10GB of live data to a satellite-connected phone? We don't.
 
 ## 🚀 Quick Start
 
+### Prerequisites
+Copy the environment template and add your Mapbox API keys:
+```bash
+cp .env.example .env
+# Edit .env and add your Mapbox tokens from https://account.mapbox.com/access-tokens/
+```
+
 ### For Developers (Conductor)
 ```bash
 cd conductor
@@ -84,7 +91,7 @@ uv run mag-slicer demo
 ### For Mobile Devs (Expo)
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Start development server
 npx expo start

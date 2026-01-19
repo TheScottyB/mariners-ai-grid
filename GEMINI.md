@@ -84,6 +84,6 @@ npx expo start
 *Note: Native modules (sqlite-vec) require a Development Build or Simulator, not Expo Go.*
 
 ## ⚠️ Critical "Gotchas"
-1.  **Date Simulation:** The environment simulates **Jan 19, 2026**. Live data fetches might 404 if the real-world date doesn't match. Rely on Mock seeds for reliable testing.
+1.  **Time Context:** Project launched January 2026. If this seems like the future, verify your system time is correct.
 2.  **Native Rebuilds:** If you modify `plugins/with-sqlite-vec`, you **MUST** run `npx expo prebuild --clean` to regenerate the native project.
-3.  **Environment Variables:** `EXPO_PUBLIC_MAPBOX_TOKEN` is mandatory for the map to render.
+3.  **Environment Variables:** `EXPO_PUBLIC_MAPBOX_TOKEN` is mandatory for the map to render. Copy `.env.example` to `.env` and add your Mapbox keys before building.
