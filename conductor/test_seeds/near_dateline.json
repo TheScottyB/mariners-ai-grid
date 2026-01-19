@@ -1,0 +1,36 @@
+{
+  "success": true,
+  "seed_id": "mock_9ba7b5e00442_2026011812",
+  "request_id": "dateline-001",
+  "model_source": "mock_hres",
+  "model_run": "2026-01-18T12:00:00+00:00",
+  "bounding_box": {
+    "lat_min": 13.333333333333332,
+    "lat_max": 26.666666666666668,
+    "lon_min": 167.90548151682725,
+    "lon_max": 182.09451848317275
+  },
+  "grid_shape": [
+    25,
+    54,
+    57
+  ],
+  "variables": [
+    "u10",
+    "v10",
+    "i10fg",
+    "msl",
+    "swh",
+    "mwp",
+    "mwd",
+    "tp"
+  ],
+  "size_bytes": 1400325,
+  "compression_ratio": 1.7584489314980452,
+  "estimated_starlink_cost_usd": 2.67,
+  "estimated_iridium_cost_usd": 9.35,
+  "download_url": null,
+  "seed_base64": null,
+  "expires_at": "2026-01-19T08:56:02.927531+00:00",
+  "error": null
+}

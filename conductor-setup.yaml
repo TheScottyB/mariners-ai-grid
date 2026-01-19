@@ -1,0 +1,23 @@
+# Gemini Conductor: Phase 1 Environment & Slicer Scaffolding
+project: "Mariner's AI Grid"
+dx_standard: "2026 AI-Orchestrated"
+dx_tools: ["Warp", "Claude Code", "Gemini Conductor", "Expo SDK 54"]
+
+tasks:
+  - id: env_init
+    description: "Initialize the Expo SDK 54 environment with Fabric enabled."
+    action: "npx create-expo-app@latest . --template blank-typescript && npx expo install expo-dev-client expo-file-system expo-sqlite"
+
+  - id: data_science_scaffold
+    description: "Set up the Python environment for the Slicer logic."
+    action: "uv add xarray cfgrib pandas zstandard onnx onnxruntime-tools"
+    requirements: "Ensure 'eccodes' is installed via Homebrew for GRIB2 support."
+
+  - id: slicer_v1_prototype
+    description: "Generate the initial 'slicer.py' core for regional cropping."
+    context: "Input: 10GB Global AIFS GRIB2. Output: 5MB Zstd-compressed Parquet Seed."
+    logic_guardrail: "Maintain autoregressive state (t, t-6h) and include a 2.5-degree spatial buffer."
+
+  - id: mobile_bridge_setup
+    description: "Scaffold the Signal K WebSocket listener and ONNX Runtime integration."
+    target_files: ["src/services/SignalKBridge.ts", "src/services/MarinerInference.ts"]

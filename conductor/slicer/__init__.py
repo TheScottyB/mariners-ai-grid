@@ -18,6 +18,7 @@ from slicer.core import (
     WeatherSeed,
     ECMWFHRESSlicer,
 )
+from slicer.aifs import AIFSSlicer
 from slicer.variables import MARINE_VARIABLES, VariablePruner
 from slicer.export import SeedExporter
 
@@ -27,6 +28,7 @@ __all__ = [
     "BoundingBox",
     "WeatherSeed",
     "ECMWFHRESSlicer",
+    "AIFSSlicer",
     "MARINE_VARIABLES",
     "VariablePruner",
     "SeedExporter",

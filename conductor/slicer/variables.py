@@ -27,6 +27,7 @@ class VariableCategory(Enum):
     PRECIPITATION = "precipitation"
     VISIBILITY = "visibility"
     TEMPERATURE = "temperature"
+    HUMIDITY = "humidity"
     CURRENT = "current"
 
 
@@ -229,6 +230,68 @@ MARINE_VARIABLES: dict[str, MarineVariable] = {
         precision_digits=2,
         valid_range=(0.0, 1.0),
     ),
+
+    # === GRAPHCAST / UPPER AIR (AI Model Inputs) ===
+    "z": MarineVariable(
+        short_name="z",
+        param_id=129,
+        cf_name="z",
+        category=VariableCategory.PRESSURE,
+        description="Geopotential",
+        units="m^2 s^-2",
+        level_type="isobaricInhPa",
+        level=None,  # Multi-level
+        precision_digits=0,
+        valid_range=(-1000.0, 100000.0),
+    ),
+    "q": MarineVariable(
+        short_name="q",
+        param_id=133,
+        cf_name="q",
+        category=VariableCategory.HUMIDITY,
+        description="Specific humidity",
+        units="kg kg^-1",
+        level_type="isobaricInhPa",
+        level=None,
+        precision_digits=5,
+        valid_range=(0.0, 0.03),
+    ),
+    "t": MarineVariable(
+        short_name="t",
+        param_id=130,
+        cf_name="t",
+        category=VariableCategory.TEMPERATURE,
+        description="Temperature",
+        units="K",
+        level_type="isobaricInhPa",
+        level=None,
+        precision_digits=1,
+        valid_range=(180.0, 330.0),
+    ),
+    "u": MarineVariable(
+        short_name="u",
+        param_id=131,
+        cf_name="u",
+        category=VariableCategory.WIND,
+        description="U component of wind",
+        units="m s-1",
+        level_type="isobaricInhPa",
+        level=None,
+        precision_digits=1,
+        valid_range=(-100.0, 100.0),
+    ),
+    "v": MarineVariable(
+        short_name="v",
+        param_id=132,
+        cf_name="v",
+        category=VariableCategory.WIND,
+        description="V component of wind",
+        units="m s-1",
+        level_type="isobaricInhPa",
+        level=None,
+        precision_digits=1,
+        valid_range=(-100.0, 100.0),
+    ),
 }
 
 # Minimal subset for extreme bandwidth constraints (Iridium)
@@ -236,6 +299,12 @@ MINIMAL_VARIABLES = ["u10", "v10", "msl", "swh"]
 
 # Standard subset for most passages
 STANDARD_VARIABLES = ["u10", "v10", "gust", "msl", "swh", "mwp", "mwd", "tp"]
+
+# GraphCast Seed subset (Surface + Key Upper Air)
+GRAPHCAST_VARIABLES = [
+    "u10", "v10", "msl", "t2m",  # Surface
+    "z", "q", "t", "u", "v"      # Upper Air (multi-level)
+]
 
 # Full marine subset (all defined variables)
 FULL_VARIABLES = list(MARINE_VARIABLES.keys())
