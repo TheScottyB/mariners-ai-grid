@@ -194,16 +194,38 @@ export class SignalKBridge {
 
     for (const update of delta.updates) {
       for (const val of update.values || []) {
-        // ... (Same processing logic as before, abbreviated for clarity)
         switch (val.path) {
           case 'navigation.position':
-            this.currentTelemetry.position = { lat: val.value.latitude, lon: val.value.longitude };
+            if (val.value && typeof val.value.latitude === 'number' && typeof val.value.longitude === 'number') {
+              this.currentTelemetry.position = { lat: val.value.latitude, lon: val.value.longitude };
+            }
             break;
           case 'navigation.headingTrue':
             this.currentTelemetry.heading = this.radToDeg(val.value);
             break;
+          case 'navigation.speedOverGround':
+            this.currentTelemetry.sog = this.msToKnots(val.value);
+            break;
           case 'environment.outside.pressure':
             this.currentTelemetry.barometer = val.value / 100; // Pa to hPa
+            break;
+          case 'environment.outside.temperature':
+            this.currentTelemetry.temperature = val.value - 273.15; // K to C
+            break;
+          case 'environment.outside.humidity':
+            this.currentTelemetry.humidity = val.value * 100; // 0-1 to 0-100%
+            break;
+          case 'environment.wind.speedApparent':
+            this.currentTelemetry.apparentWindSpeed = this.msToKnots(val.value);
+            break;
+          case 'environment.wind.angleApparent':
+            this.currentTelemetry.apparentWindAngle = this.radToDeg(val.value);
+            break;
+          case 'environment.wind.speedTrue':
+            this.currentTelemetry.trueWindSpeed = this.msToKnots(val.value);
+            break;
+          case 'environment.wind.angleTrueGround':
+            this.currentTelemetry.trueWindAngle = this.radToDeg(val.value);
             break;
           case 'environment.wind.u10':
             this.currentTelemetry.windU = val.value;

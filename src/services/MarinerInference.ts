@@ -2,6 +2,7 @@ import * as ort from 'onnxruntime-react-native';
 // @ts-ignore - Using 2026 Next-gen File System
 import { File } from 'expo-file-system/next';
 import { Buffer } from 'buffer';
+import { WeatherSeed } from '../schema/schema/weather_seed';
 
 /**
  * MarinerInference handles the local GraphCast execution.
@@ -65,11 +66,39 @@ export class MarinerInference {
   }
 
   private async prepareTensors(buffer: Buffer): Promise<Record<string, ort.Tensor>> {
-    // Logic converted from Python Slicer shapes by Claude Code
-    // Converts Protobuf bytes into Float32 tensors for the NPU
-    const dummyData = new Float32Array(1000).fill(0);
+    const seed = WeatherSeed.decode(new Uint8Array(buffer));
+    
+    // Total size calculation for tensor allocation
+    const timeSteps = seed.timeStepsIso.length || 1;
+    const latPoints = seed.latitudes.length;
+    const lonPoints = seed.longitudes.length;
+    const numVars = seed.variables.length;
+    
+    const totalElements = numVars * timeSteps * latPoints * lonPoints;
+    const tensorData = new Float32Array(totalElements);
+    
+    let offset = 0;
+    for (const namedVar of seed.variables) {
+      const data = namedVar.data;
+      if (!data) continue;
+      
+      let values: Float32Array;
+      if (data.quantizedValues && data.quantizedValues.length > 0) {
+        // Dequantize: original = offset + (quantized * scale)
+        values = new Float32Array(data.quantizedValues.length);
+        for (let i = 0; i < data.quantizedValues.length; i++) {
+          values[i] = data.addOffset + (data.quantizedValues[i] * data.scaleFactor);
+        }
+      } else {
+        values = new Float32Array(data.values);
+      }
+      
+      tensorData.set(values, offset);
+      offset += values.length;
+    }
+
     return {
-      "input_node": new ort.Tensor('float32', dummyData, [1, 1000])
+      "input_node": new ort.Tensor('float32', tensorData, [1, numVars, timeSteps, latPoints, lonPoints])
     }; 
   }
 
