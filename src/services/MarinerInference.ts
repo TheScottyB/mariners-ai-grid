@@ -80,21 +80,26 @@ export class MarinerInference {
     let offset = 0;
     for (const namedVar of seed.variables) {
       const data = namedVar.data;
-      if (!data) continue;
-      
-      let values: Float32Array;
-      if (data.quantizedValues && data.quantizedValues.length > 0) {
-        // Dequantize: original = offset + (quantized * scale)
-        values = new Float32Array(data.quantizedValues.length);
-        for (let i = 0; i < data.quantizedValues.length; i++) {
-          values[i] = data.addOffset + (data.quantizedValues[i] * data.scaleFactor);
-        }
-      } else {
-        values = new Float32Array(data.values);
+      if (!data) {
+        // Skip or fill with zeros if missing to maintain shape alignment
+        // Ideally this shouldn't happen with valid seeds
+        offset += timeSteps * latPoints * lonPoints;
+        continue;
       }
       
-      tensorData.set(values, offset);
-      offset += values.length;
+      // Optimization: Write directly to tensorData to avoid intermediate allocations
+      if (data.quantizedValues && data.quantizedValues.length > 0) {
+        // Dequantize: original = offset + (quantized * scale)
+        const { quantizedValues, scaleFactor, addOffset } = data;
+        for (let i = 0; i < quantizedValues.length; i++) {
+          tensorData[offset + i] = addOffset + (quantizedValues[i] * scaleFactor);
+        }
+        offset += quantizedValues.length;
+      } else if (data.values && data.values.length > 0) {
+        // Raw values
+        tensorData.set(data.values, offset);
+        offset += data.values.length;
+      }
     }
 
     return {
