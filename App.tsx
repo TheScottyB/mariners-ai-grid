@@ -9,6 +9,7 @@ import { windDataToGeoJSON } from './src/utils/geoUtils';
 import MarinerMap, { VesselLocation } from './src/components/MarinerMap';
 import { HazardReportingModal } from './src/components/HazardReportingModal';
 import { PatternAlertStack, ConsensusData } from './src/components/PatternAlert';
+import { FirstWatchOnboarding, isOnboardingComplete } from './src/components/FirstWatchOnboarding';
 import { useSeedManager } from './src/hooks/useSeedManager';
 import { PatternMatcher, PatternAlert as PatternAlertType, TelemetrySnapshot } from './src/services/PatternMatcher';
 import { VecDB, AtmosphericVector } from './src/services/VecDB';
@@ -20,8 +21,9 @@ import type { FeatureCollection, Point } from 'geojson';
 export default function App() {
   const [identity, setIdentity] = useState<MarinerIdentity | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [forecastData, setForecastData] = useState<FeatureCollection<Point> | undefined>(undefined);
-  
+
   // Hazard Reporting State
   const [reportingVisible, setReportingVisible] = useState(false);
   const [reportLocation, setReportLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -152,6 +154,14 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
+      // 0. Check if First Watch onboarding is complete
+      const onboardingDone = await isOnboardingComplete();
+      if (!onboardingDone) {
+        setShowOnboarding(true);
+        setLoading(false);
+        return; // Don't initialize services until onboarding complete
+      }
+
       // 1. Initialize SQLite Database
       const db = await SQLite.openDatabaseAsync('mariners_grid.db');
       dbRef.current = db;
@@ -278,7 +288,7 @@ export default function App() {
 
   const handleSubmitHazard = async (partialHazard: Partial<MarineHazard>) => {
     const idService = IdentityService.getInstance();
-    
+
     const fullHazard = {
       ...partialHazard,
       id: Math.random().toString(36).substr(2, 9), // Temporary local ID
@@ -286,7 +296,7 @@ export default function App() {
     };
 
     console.log('[Waze] Submitting Hazard Report:', fullHazard);
-    
+
     // In production, this would save to SQLite/vec and sync to cloud
     Alert.alert(
       "Report Transmitted",
@@ -294,6 +304,126 @@ export default function App() {
       [{ text: "Steady as she goes", onPress: () => setReportingVisible(false) }]
     );
   };
+
+  // Handle onboarding completion - re-run init to set up services
+  const handleOnboardingComplete = useCallback(async () => {
+    setShowOnboarding(false);
+    setLoading(true);
+
+    // Now initialize all services (same as the main init flow)
+    try {
+      // 1. Initialize SQLite Database
+      const db = await SQLite.openDatabaseAsync('mariners_grid.db');
+      dbRef.current = db;
+
+      // Initialize VecDB for pattern matching
+      const vecDb = new VecDB(db);
+      await vecDb.initialize().catch(e => console.warn('[App] VecDB init (extension may not be available):', e));
+      vecDbRef.current = vecDb;
+
+      // Initialize VesselSnapshot for divergence capture
+      const vesselSnapshot = new VesselSnapshot(db);
+      await vesselSnapshot.initialize().catch(e => console.warn('[App] VesselSnapshot init failed:', e));
+      vesselSnapshotRef.current = vesselSnapshot;
+
+      // Initialize GridSync for fleet coordination
+      const gridSync = new GridSync(db, vesselSnapshot, vecDb);
+      await gridSync.initialize().catch(e => console.warn('[App] GridSync init failed:', e));
+      await gridSync.registerBackgroundSync().catch(e => console.warn('[App] Background sync registration failed:', e));
+      gridSyncRef.current = gridSync;
+
+      // Set up GridSync callbacks
+      gridSync.onEvents({
+        onHazardReceived: (hazard) => {
+          console.log(`[App] Received grid hazard: ${hazard.type} at ${hazard.lat}, ${hazard.lon}`);
+        },
+        onPatternLearned: (pattern) => {
+          console.log(`[App] Learned new pattern: ${pattern.label}`);
+        },
+        onSyncComplete: (result) => {
+          console.log(`[App] Grid sync: ${result.uploaded} up, ${result.downloaded} down, ${result.hazardsReceived} hazards`);
+        },
+      });
+
+      // 2. Initialize Identity
+      const idService = IdentityService.getInstance();
+      const user = await idService.getOrInitializeIdentity();
+      setIdentity(user);
+
+      // 3. Connect to Signal K (already configured during onboarding)
+      skBridge.current.connect((delta) => {
+        if (delta.updates) {
+          delta.updates.forEach((update: any) => {
+            update.values.forEach((val: any) => {
+              if (val.path === 'navigation.position') {
+                setVesselLocation(prev => ({
+                  ...prev,
+                  lat: val.value.latitude,
+                  lng: val.value.longitude,
+                  timestamp: Date.now(),
+                }));
+              } else if (val.path === 'navigation.headingTrue') {
+                setVesselLocation(prev => ({
+                  ...prev,
+                  heading: (val.value * 180) / Math.PI,
+                }));
+              } else if (val.path === 'navigation.speedOverGround') {
+                setVesselLocation(prev => ({
+                  ...prev,
+                  sog: val.value * 1.94384,
+                }));
+              }
+            });
+          });
+        }
+      });
+
+      // 4. Initialize Pattern Matcher
+      try {
+        const matcher = new PatternMatcher(db);
+        await matcher.initialize();
+
+        matcher.start((alert) => {
+          console.log('[App] Pattern Alert:', alert.title);
+          setActiveAlerts(prev => {
+            if (acknowledgedAlerts.has(alert.id)) return prev;
+            if (prev.some(a => a.id === alert.id)) return prev;
+            return [alert, ...prev];
+          });
+        });
+
+        skBridge.current.onTelemetry((snapshot) => {
+          matcher.processTelemetry(snapshot);
+          lastTelemetryRef.current = snapshot;
+
+          if (gridSyncRef.current) {
+            gridSyncRef.current.setPosition(snapshot.position.lat, snapshot.position.lon);
+          }
+        });
+
+        patternMatcherRef.current = matcher;
+        console.log('[App] Pattern Matcher initialized');
+      } catch (e) {
+        console.warn('[App] Pattern Matcher init failed:', e);
+      }
+
+      console.log('[App] Post-onboarding initialization complete');
+    } catch (e) {
+      console.error('[App] Post-onboarding init failed:', e);
+    }
+
+    setLoading(false);
+  }, [acknowledgedAlerts]);
+
+  // Show First Watch onboarding for new users
+  if (showOnboarding) {
+    return (
+      <FirstWatchOnboarding
+        onComplete={handleOnboardingComplete}
+        signalKBridge={skBridge.current}
+      />
+    );
+  }
 
   if (loading) {
     return (
