@@ -67,10 +67,7 @@ export default ({ config }) => {
         "expo-build-properties",
         {
           ios: {
-            deploymentTarget: "15.1",
-            extraPodfileProperties: {
-              "expo.sqlite.withSQLiteVecExtension": "true"
-            }
+            deploymentTarget: "15.1"
           },
           android: {
             compileSdkVersion: 36,
