@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, ActivityIndicator, SafeAreaView, Alert } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import * as SQLite from 'expo-sqlite';
 import { IdentityService, MarinerIdentity } from './src/services/IdentityService';
@@ -17,6 +18,8 @@ import { GridSync } from './src/services/GridSync';
 import { MarineHazard } from './src/utils/geoUtils';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
 import type { FeatureCollection, Point } from 'geojson';
+
+import { RemoteConfig } from './src/services/RemoteConfig';
 
 export default function App() {
   const [identity, setIdentity] = useState<MarinerIdentity | null>(null);
@@ -57,6 +60,9 @@ export default function App() {
 
   const initializeServices = useCallback(async () => {
     try {
+      // 0. Initialize Remote Config
+      await RemoteConfig.getInstance().initialize();
+
       // 1. Initialize SQLite Database
       const db = await SQLite.openDatabaseAsync('mariners_grid.db');
       dbRef.current = db;
@@ -192,43 +198,46 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>MARINER'S AI</Text>
-        <View style={styles.identityBadge}>
-          <Text style={styles.badgeText}>ID: {identity?.deviceId.slice(0, 8)}</Text>
+    <SQLite.SQLiteProvider databaseName="mariners_grid.db" useSuspense={false}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>MARINER'S AI</Text>
+          <View style={styles.identityBadge}>
+            <Text style={styles.badgeText}>ID: {identity?.deviceId.slice(0, 8)}</Text>
+          </View>
         </View>
-      </View>
 
-      <View style={styles.mapWrapper}>
-        <MarinerMap
-          vesselLocation={vesselLocation}
-          forecastData={seedManager.windGeoJSON || forecastData}
-          onReportHazard={(loc) => {
-            setReportLocation(loc);
-            setReportingVisible(true);
+        <View style={styles.mapWrapper}>
+          <MarinerMap
+            vesselLocation={vesselLocation}
+            forecastData={seedManager.windGeoJSON || forecastData}
+            onReportHazard={(loc) => {
+              setReportLocation(loc);
+              setReportingVisible(true);
+            }}
+            featureFlags={RemoteConfig.getInstance().getAllFlags()}
+          />
+
+          <PatternAlertStack
+            alerts={activeAlerts}
+            consensusMap={consensusMap}
+            onAcknowledge={handleAcknowledgeAlert}
+          />
+        </View>
+
+        <HazardReportingModal
+          visible={reportingVisible}
+          location={reportLocation}
+          onClose={() => setReportingVisible(false)}
+          onSubmit={async (partial) => {
+            Alert.alert("Report Sent", "Observation shared with AI Grid.");
+            setReportingVisible(false);
           }}
         />
 
-        <PatternAlertStack
-          alerts={activeAlerts}
-          consensusMap={consensusMap}
-          onAcknowledge={handleAcknowledgeAlert}
-        />
-      </View>
-
-      <HazardReportingModal
-        visible={reportingVisible}
-        location={reportLocation}
-        onClose={() => setReportingVisible(false)}
-        onSubmit={async (partial) => {
-          Alert.alert("Report Sent", "Observation shared with AI Grid.");
-          setReportingVisible(false);
-        }}
-      />
-
-      <StatusBar style="light" />
-    </SafeAreaView>
+        <StatusBar style="light" />
+      </SafeAreaView>
+    </SQLite.SQLiteProvider>
   );
 }
 

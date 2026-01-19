@@ -38,6 +38,38 @@ export default ({ config }) => {
         NSLocalNetworkUsageDescription: "Required to connect to your boat's Signal K server.",
         NSLocationWhenInUseUsageDescription: "Required to show your current position on the weather grid.",
         NSLocationAlwaysAndWhenInUseUsageDescription: "Required for background weather alerts and route optimization."
+      },
+      privacyManifests: {
+        NSPrivacyAccessedAPITypes: [
+          {
+            NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryDiskSpace",
+            NSPrivacyAccessedAPITypeReasons: ["E174.1"] // Required for caching weather seeds and offline vector DB
+          },
+          {
+            NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryFileTimestamp",
+            NSPrivacyAccessedAPITypeReasons: ["DDA9.1"] // Required to check weather seed freshness
+          },
+          {
+            NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryUserDefaults",
+            NSPrivacyAccessedAPITypeReasons: ["CA92.1"] // Used by expo-secure-store for Shadow Auth
+          }
+        ],
+        NSPrivacyCollectedDataTypes: [
+          {
+            NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeDeviceID",
+            NSPrivacyCollectedDataTypeLinked: true,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          },
+          {
+            NSPrivacyCollectedDataType: "NSPrivacyCollectedDataTypeCoarseLocation",
+            NSPrivacyCollectedDataTypeLinked: false,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: ["NSPrivacyCollectedDataTypePurposeAppFunctionality"]
+          }
+        ],
+        NSPrivacyTracking: false,
+        NSPrivacyTrackingDomains: []
       }
     },
     android: {

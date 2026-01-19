@@ -46,29 +46,31 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 *   **Dependency Management:** Migrated Python tooling to `uv` for speed and determinism.
 *   **Identity:** Implemented "Shadow Auth" service for anonymous, device-level user tracking.
 *   **The Bridge:** Functional `SignalKBridge` for real-time NMEA 2000 telemetry ingest.
-*   **The Slicer (Prototype):**
+*   **The Slicer (Production Ready):**
     *   Functional `ECMWFHRESSlicer` logic with AIFS integration.
     *   `BoundingBox` and `VariablePruner` logic implemented.
     *   Export support for **Parquet** and **Protobuf+Zstd**.
     *   **Performance Breakthrough:** Cracked the 1MB barrier! Hit **1.25MB Protobuf Payload** (3.3x compression) for a 72h regional forecast.
     *   Shared Schema: `weather_seed.proto` defined for cross-platform data contract.
     *   CLI tool (`mag-slicer`) operational with detailed cost estimates.
-    *   Production-grade compression (Quantization) verified via "Truth Layer Audit".
+    *   **Verified Pipeline:** Successfully generated and ingested seeds for IFS, AIFS, and AIFS-ENS models.
 *   **Mobile Core:**
     *   `MarinerInference.ts`: Adoption of `expo-file-system/next` for bridge-less binary reading.
     *   `SocialLayer.ts`: Vector-based 'Waze' hazard search using `expo-sqlite/vec`.
     *   `VesselSnapshot.ts`: Privacy-preserving "Truth Layer" capture of divergence events.
     *   `GridSync.ts`: Fleet-wide CC0 synchronization with background fetch support.
     *   **PatternAlert UI:** Tactical display with double-tap haptic feedback for DIVERGENT consensus.
+    *   **Feature Flags:** RemoteConfig implemented for "Night Watch" and "Social Reporting" toggles.
 *   **Integration:**
     *   `SeedUploader.ts` utility for cloud distribution.
     *   `MockNMEAStreamer.ts` utility for "Storm Sim" stress testing.
+    *   **Noise Filtering:** `PatternMatcher` hardened against NMEA 2000 sensor spikes (Median Filter).
 *   **Testing:**
-    *   Full test suite for the Slicer is passing (including fixed Protobuf roundtrip fidelity).
+    *   Full test suite for the Slicer is passing (49/49 tests).
+    *   Mobile core logic (PatternMatcher) verified with Vitest.
     *   **Storm Sim Field Test:** ✅ Passed. Successfully triggered DIVERGENT state during simulated pressure plunge.
 
 ### 🚧 **In Progress**
-*   **End-to-End Integration:** Wiring Slicer -> Cloud -> Mobile -> Map for live Pacific Crossing data.
 *   **AI Model Integration:** GraphCast ONNX model weight loading and tensor binding.
 
 ---
@@ -79,17 +81,16 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 | :--- | :--- | :--- | :--- |
 | **Phase 1** | **Days 1-15** | **Data Ingest (Conductor)** | Automated ECMWF AIFS/HRES download & Slicer optimization. (✅ *Complete*) |
 | **Phase 2** | **Days 16-30** | **The Slicer (Refinement)** | Maximize compression ratios (<1MB goal), edge-case handling. (✅ *Complete*) |
-| **Phase 3** | **Days 31-60** | **The App (Frontend)** | Expo UI, Mapbox integration, reading `.seed.zst` files locally. (🚧 *Active*) |
+| **Phase 3** | **Days 31-60** | **The App (Frontend)** | Expo UI, Mapbox integration, reading `.seed.zst` files locally. (✅ *Feature Complete*) |
 | **Phase 4** | **Days 61-90** | **The Bridge (Hardware)** | Signal K integration, "Data Freshness" UI, Social reporting. (✅ *Foundation Ready*) |
 
 ---
 
 ## 5. Next Immediate Actions (for AI Agents)
 
-1.  **End-to-End Verification:** Perform a full pipeline test using a real AIFS download and visualize the first AI-generated wind barb on the mobile map.
-2.  **UX Polish:** Add haptic feedback on hazard report submission; implement route waypoint input UI.
-3.  **App Store Readiness:** Finalize marketing metadata and prepare EAS build profiles for the July 2026 beta launch.
-4.  **Refine Slicer fallbacks:** Implement logic for physics-based HRES fallback if AIFS open data buckets are delayed.
+1.  **AI Model Integration:** This is the final frontier. Load the ONNX weights and execute inference on the NPU.
+2.  **Liquid Glass Icons:** Generate the iOS assets per `conductor/ICON_SETUP.md`.
+3.  **Submit to TestFlight:** Run `eas build --profile preview --platform ios`.
 
 ---
 

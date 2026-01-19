@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { MarineHazard } from '../utils/geoUtils';
 
 export interface HazardReportingModalProps {
@@ -42,8 +43,13 @@ export const HazardReportingModal: React.FC<HazardReportingModalProps> = ({
   const [selectedType, setSelectedType] = useState<MarineHazard['type']>('debris');
   const [description, setDescription] = useState('');
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!location) return;
+
+    // Trigger haptic feedback on submission
+    if (Platform.OS !== 'web') {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
 
     onSubmit({
       type: selectedType,

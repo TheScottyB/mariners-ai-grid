@@ -29,6 +29,7 @@ import {
   distanceNM,
 } from '../utils/geoUtils';
 import { usePowerSaveMode } from '../hooks/usePowerSaveMode';
+import { FeatureFlags } from '../services/RemoteConfig';
 
 // Initialize Mapbox - Token should be in .env as EXPO_PUBLIC_MAPBOX_TOKEN
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '');
@@ -52,6 +53,8 @@ export interface MarinerMapProps {
   onHazardPress?: (hazard: MarineHazard) => void;
   /** Callback when user long-presses to report a new hazard */
   onReportHazard?: (location: { lat: number; lng: number }) => void;
+  /** Feature flags for UI toggles */
+  featureFlags?: FeatureFlags;
 }
 
 export const MarinerMap: React.FC<MarinerMapProps> = ({
@@ -60,6 +63,7 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
   hazardSearchRadiusNm = 50,
   onHazardPress,
   onReportHazard,
+  featureFlags,
 }) => {
   const mapRef = useRef<MapView>(null);
   const db = useSQLiteContext();
@@ -75,6 +79,10 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
     enablePowerSave,
     disablePowerSave,
   } = usePowerSaveMode(vesselLocation.heading);
+  
+  // Feature Flags
+  const isSocialEnabled = featureFlags?.socialReporting ?? true;
+  const isNightWatchEnabled = featureFlags?.nightWatch ?? false;
 
   // Convert forecast data to GeoJSON if it's raw wind data
   const windGeoJSON = useMemo(() => {
@@ -88,6 +96,11 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
 
   // Fetch "Waze" Social Hazards from local SQLite/vec
   useEffect(() => {
+    if (!isSocialEnabled) {
+        setHazards([]);
+        return;
+    }
+
     const fetchHazards = async () => {
       try {
         // Note: In production, you'd use expo-sqlite/vec for vector similarity search
@@ -127,7 +140,7 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
     // Refresh hazards every 30 seconds
     const interval = setInterval(fetchHazards, 30000);
     return () => clearInterval(interval);
-  }, [vesselLocation.lat, vesselLocation.lng, hazardSearchRadiusNm, db]);
+  }, [vesselLocation.lat, vesselLocation.lng, hazardSearchRadiusNm, db, isSocialEnabled]);
 
   // Check data freshness (for the "Amber Warning" system)
   useEffect(() => {
@@ -155,6 +168,8 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
 
   // Handle long press for hazard reporting
   const handleLongPress = (event: any) => {
+    if (!isSocialEnabled) return;
+    
     const { geometry } = event;
     if (geometry && onReportHazard) {
       onReportHazard({
@@ -197,7 +212,7 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
       <MapView
         ref={mapRef}
         style={styles.map}
-        styleURL={Mapbox.StyleURL.Dark} // High-contrast for night watches
+        styleURL={isNightWatchEnabled ? Mapbox.StyleURL.Dark : Mapbox.StyleURL.Outdoors} 
         logoEnabled={false}
         attributionEnabled={false}
         compassEnabled={true}
@@ -235,7 +250,7 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
         )}
 
         {/* 3. The "Waze" Layer (Social Hazard Pins) */}
-        {hazardGeoJSON.features.length > 0 && (
+        {isSocialEnabled && hazardGeoJSON.features.length > 0 && (
           <ShapeSource
             id="hazardSource"
             shape={hazardGeoJSON}

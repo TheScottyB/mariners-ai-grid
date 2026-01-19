@@ -102,6 +102,7 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
                 forecast_hours=hours,
                 time_step_hours=step,
                 variables=var_list,
+                model_source=f"mock_{model_type}",
             )
         elif model_type == "ifs":
             seed = slicer.slice(

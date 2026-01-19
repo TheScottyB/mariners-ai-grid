@@ -303,6 +303,7 @@ class ECMWFHRESSlicer:
         time_step_hours: int = 3,
         variables: Optional[list[str]] = None,
         model_run: Optional[datetime] = None,
+        model_source: str = "mock_hres",
     ) -> WeatherSeed:
         """
         Extract a regional weather slice.
@@ -313,6 +314,7 @@ class ECMWFHRESSlicer:
             time_step_hours: Time step interval
             variables: List of variable names (default: standard marine set)
             model_run: Specific model run time (default: latest available)
+            model_source: Label for the model source (used in offline mode)
 
         Returns:
             WeatherSeed containing the regional extract
@@ -335,13 +337,16 @@ class ECMWFHRESSlicer:
         cache_key = self._cache_key(bbox, model_run, forecast_hours, var_names)
         cached = self._load_from_cache(cache_key)
         if cached is not None:
-            logger.info(f"Cache hit: {cache_key}")
-            return cached
+            # If we want a specific mock source but cached one is different, we might skip cache
+            # But for simplicity, we assume cache is valid or user clears it
+            if self.offline_mode and cached.model_source == model_source:
+                logger.info(f"Cache hit: {cache_key}")
+                return cached
 
         # Fetch from CDS API or generate mock
         if self.offline_mode or self.cds_client is None:
             seed = self._generate_mock_seed(
-                bbox, model_run, forecast_hours, time_step_hours, var_defs
+                bbox, model_run, forecast_hours, time_step_hours, var_defs, model_source
             )
         else:
             seed = self._fetch_from_cds(
@@ -541,6 +546,7 @@ class ECMWFHRESSlicer:
         forecast_hours: int,
         time_step_hours: int,
         var_defs: list,
+        model_source: str = "mock_hres",
     ) -> WeatherSeed:
         """
         Generate realistic mock data for testing without CDS access.
@@ -586,9 +592,9 @@ class ECMWFHRESSlicer:
             variables[var.cf_name] = data
 
         return WeatherSeed(
-            seed_id=f"mock_{bbox.cache_key()}_{model_run.strftime('%Y%m%d%H')}",
+            seed_id=f"{model_source.replace('ecmwf_', '')}_{bbox.cache_key()}_{model_run.strftime('%Y%m%d%H')}",
             created_at=datetime.now(timezone.utc),
-            model_source="mock_hres",
+            model_source=model_source,
             model_run=model_run,
             bounding_box=bbox,
             resolution_deg=self.resolution,

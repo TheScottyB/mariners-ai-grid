@@ -388,19 +388,54 @@ export class PatternMatcher {
   }
 
   /**
+   * Get median pressure from recent history to filter out NMEA noise spikes.
+   */
+  private getSmoothedPressure(current: number | undefined): number | undefined {
+    if (current === undefined) return undefined;
+
+    // Look at last 4 readings + current (window of 5)
+    const recent = this.telemetryBuffer
+      .slice(-4)
+      .map(t => t.barometer)
+      .filter((p): p is number => p !== undefined);
+    
+    recent.push(current);
+    
+    if (recent.length === 0) return undefined;
+
+    // Sort for median
+    recent.sort((a, b) => a - b);
+    const mid = Math.floor(recent.length / 2);
+    
+    return recent.length % 2 !== 0
+      ? recent[mid]
+      : (recent[mid - 1] + recent[mid]) / 2;
+  }
+
+  /**
    * Convert raw telemetry to normalized atmospheric vector.
    */
   private telemetryToVector(telemetry: TelemetrySnapshot): AtmosphericVector {
     // Calculate pressure trend from buffer
     let pressureTrend = 0;
-    if (this.telemetryBuffer.length >= 2 && telemetry.barometer) {
+    
+    // Smooth the current pressure reading
+    const currentSmoothedPressure = this.getSmoothedPressure(telemetry.barometer);
+
+    if (this.telemetryBuffer.length >= 2 && currentSmoothedPressure !== undefined) {
       const oldestWithPressure = this.telemetryBuffer.find(t => t.barometer);
+      
+      // We rely on the oldest RAW reading being "good enough" if it was stored 
+      // (assuming transient noise is filtered out before acting, 
+      // but here we just grab the oldest. Ideally we'd smooth that too).
       if (oldestWithPressure?.barometer) {
         const hourFraction = (telemetry.timestamp - oldestWithPressure.timestamp) / (60 * 60 * 1000);
-        if (hourFraction > 0) {
+        
+        // Prevent division by zero or extremely small intervals
+        if (hourFraction > 0.001) {
           // hPa change per hour, normalized to [-1, 1] (±10 hPa/hr = ±1)
           pressureTrend = Math.max(-1, Math.min(1,
-            (telemetry.barometer - oldestWithPressure.barometer) / hourFraction / 10
+            (currentSmoothedPressure - oldestWithPressure.barometer) / hourFraction / 10
           ));
         }
       }
@@ -420,8 +455,8 @@ export class PatternMatcher {
       temperature: telemetry.temperature !== undefined
         ? Math.max(-1, Math.min(1, (telemetry.temperature - 15) / 25)) // 15°C = 0, range -10 to 40
         : 0,
-      pressure: telemetry.barometer !== undefined
-        ? Math.max(-1, Math.min(1, (telemetry.barometer - 1013) / 30)) // 1013 hPa = 0
+      pressure: currentSmoothedPressure !== undefined
+        ? Math.max(-1, Math.min(1, (currentSmoothedPressure - 1013) / 30)) // 1013 hPa = 0
         : 0,
       humidity: telemetry.humidity !== undefined
         ? telemetry.humidity / 100

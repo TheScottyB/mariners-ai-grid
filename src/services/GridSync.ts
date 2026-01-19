@@ -17,8 +17,15 @@
  */
 
 import * as Network from 'expo-network';
-import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
+
+// Conditional import to avoid module not found errors in dev
+let BackgroundTask: any = null;
+try {
+  BackgroundTask = require('expo-background-task');
+} catch (e) {
+  console.warn('[GridSync] expo-background-task not available - background sync disabled');
+}
 import * as Notifications from 'expo-notifications';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { VesselSnapshot, DivergenceSnapshot, SnapshotQueueItem } from './VesselSnapshot';
@@ -196,22 +203,28 @@ export class GridSync {
    */
   async registerBackgroundSync(): Promise<boolean> {
     try {
+      // Check if BackgroundTask is available (requires development build)
+      if (!BackgroundTask || !BackgroundTask.registerTaskAsync) {
+        console.warn('[GridSync] BackgroundTask not available - background sync disabled');
+        return false;
+      }
+
       // Define the background task
       TaskManager.defineTask(BACKGROUND_SYNC_TASK, async () => {
         console.log('[GridSync] Background sync triggered');
         try {
           const result = await this.performSync();
           return result.success
-            ? BackgroundFetch.BackgroundFetchResult.NewData
-            : BackgroundFetch.BackgroundFetchResult.Failed;
+            ? BackgroundTask.BackgroundTaskResult.NewData
+            : BackgroundTask.BackgroundTaskResult.Failed;
         } catch (error) {
           console.error('[GridSync] Background sync error:', error);
-          return BackgroundFetch.BackgroundFetchResult.Failed;
+          return BackgroundTask.BackgroundTaskResult.Failed;
         }
       });
 
-      // Register the background fetch
-      await BackgroundFetch.registerTaskAsync(BACKGROUND_SYNC_TASK, {
+      // Register the background task
+      await BackgroundTask.registerTaskAsync(BACKGROUND_SYNC_TASK, {
         minimumInterval: SYNC_CONFIG.backgroundIntervalMinutes * 60,
         stopOnTerminate: false,
         startOnBoot: true,
