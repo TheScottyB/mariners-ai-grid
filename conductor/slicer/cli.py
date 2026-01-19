@@ -44,7 +44,15 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
     from slicer.export import SeedExporter, compare_formats
     from slicer.variables import MINIMAL_VARIABLES, STANDARD_VARIABLES, FULL_VARIABLES
 
-    # ... (title logic)
+    # Create bounding box
+    bbox = BoundingBox.from_center(lat, lon, radius)
+
+    region_text = f"{bbox.lat_min:.2f} to {bbox.lat_max:.2f}N, {bbox.lon_min:.2f} to {bbox.lon_max:.2f}E"
+    console.print(f"\n[dim]Region:[/] {region_text}")
+    
+    # Explicitly single line f-string
+    coverage_text = f"{bbox.area_sq_nm:,.0f}"
+    console.print(f"[dim]Coverage:[/] {coverage_text} sq nm")
 
     # Initialize slicer
     if offline:
