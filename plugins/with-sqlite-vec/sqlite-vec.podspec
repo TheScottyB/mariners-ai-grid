@@ -14,6 +14,9 @@ Pod::Spec.new do |s|
   # Use pre-compiled static library (avoids expo-sqlite symbol prefix conflicts)
   s.vendored_libraries = 'vendor/ios/libsqlite_vec.a'
   s.preserve_paths = 'vendor/ios/libsqlite_vec.a'
+  
+  # Auto-init helper
+  s.source_files = 'sqlite-vec-auto-init.c'
 
   # Ensure library is loaded - use static frameworks for proper linking
   s.static_framework = true
