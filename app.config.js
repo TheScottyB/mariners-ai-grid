@@ -67,7 +67,10 @@ export default ({ config }) => {
         "expo-build-properties",
         {
           ios: {
-            deploymentTarget: "15.1"
+            deploymentTarget: "15.1",
+            extraPodfileProperties: {
+              "expo.sqlite.withSQLiteVecExtension": "true"
+            }
           },
           android: {
             compileSdkVersion: 36,
@@ -80,13 +83,6 @@ export default ({ config }) => {
         "@rnmapbox/maps",
         {
           RNMapboxMapsVersion: "11.16.2"
-        }
-      ],
-      [
-        "./plugins/with-sqlite-vec/withSqliteVec.js",
-        {
-          version: "0.1.6",
-          debug: IS_DEV
         }
       ]
     ],
