@@ -84,6 +84,13 @@ export default ({ config }) => {
         {
           RNMapboxMapsVersion: "11.16.2"
         }
+      ],
+      [
+        "./plugins/with-sqlite-vec/withSqliteVec.js",
+        {
+          version: "0.1.6",
+          debug: IS_DEV
+        }
       ]
     ],
     extra: {
