@@ -194,18 +194,24 @@ const withSqliteVec = (config, props = {}) => {
           }
         }
 
-        // Create fat/universal binary using lipo (if on macOS during local dev)
-        // For EAS builds, we'll use just the device library
+        // For local development, prefer simulator library
+        // For production builds (EAS), we'll use device library
         if (libPaths.length > 0) {
-          // Use the device (ios-aarch64) library for now
-          // EAS builds target real devices, not simulators
+          // Check if we're building for simulator (local dev) or device (EAS)
+          const simArm64Lib = path.join(vendorDir, 'sim-arm64', 'libsqlite_vec.a');
           const deviceLib = path.join(vendorDir, 'ios-aarch64', 'libsqlite_vec.a');
-          if (fs.existsSync(deviceLib)) {
+          
+          if (fs.existsSync(simArm64Lib)) {
+            // Use simulator library for local development
+            fs.copyFileSync(simArm64Lib, libPath);
+            console.log(`[withSqliteVec] Using simulator arm64 library for local development`);
+          } else if (fs.existsSync(deviceLib)) {
+            // Fallback to device library
             fs.copyFileSync(deviceLib, libPath);
-            console.log(`[withSqliteVec] Using device static library`);
+            console.log(`[withSqliteVec] Using device arm64 library`);
           } else if (libPaths.length > 0) {
             fs.copyFileSync(libPaths[0], libPath);
-            console.log(`[withSqliteVec] Using first available static library`);
+            console.log(`[withSqliteVec] Using first available library`);
           }
         } else {
           console.warn('[withSqliteVec] WARNING: No static libraries downloaded');

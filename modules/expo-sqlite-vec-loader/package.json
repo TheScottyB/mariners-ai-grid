@@ -1,0 +1,9 @@
+{
+  "name": "expo-sqlite-vec-loader",
+  "version": "1.0.0",
+  "description": "Expo module to load sqlite-vec extension into ExpoSQLite databases",
+  "main": "index.ts",
+  "license": "Apache-2.0",
+  "author": "Mariner's AI Grid",
+  "homepage": "https://github.com/TheScottyB/mariners-ai-grid"
+}

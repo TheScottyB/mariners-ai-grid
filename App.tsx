@@ -17,6 +17,7 @@ import { VesselSnapshot } from './src/services/VesselSnapshot';
 import { GridSync } from './src/services/GridSync';
 import { MarineHazard } from './src/utils/geoUtils';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
+import { loadVecExtension } from './modules/expo-sqlite-vec-loader';
 import type { FeatureCollection, Point } from 'geojson';
 
 import { RemoteConfig } from './src/services/RemoteConfig';
@@ -67,7 +68,14 @@ export default function App() {
       const db = await SQLite.openDatabaseAsync('mariners_grid.db');
       dbRef.current = db;
 
-      // Initialize VecDB
+      // 2. Load sqlite-vec extension
+      console.log('[App] Loading sqlite-vec extension...');
+      const vecLoaded = await loadVecExtension('mariners_grid.db');
+      if (!vecLoaded) {
+        console.warn('[App] sqlite-vec extension failed to load - vector search unavailable');
+      }
+
+      // 3. Initialize VecDB
       const vecDb = new VecDB(db);
       await vecDb.initialize().catch(e => console.warn('[App] VecDB init failed:', e));
       vecDbRef.current = vecDb;
