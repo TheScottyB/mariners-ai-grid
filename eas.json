@@ -1,10 +1,18 @@
 {
+  "$schema": "https://eas.expo.dev/schema/eas.json",
   "cli": {
     "version": ">= 16.28.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "remote",
+    "requireCommit": true
   },
   "build": {
+    "base": {
+      "env": {
+        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "@rnmapbox-download-token"
+      }
+    },
     "development": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
@@ -12,6 +20,7 @@
       }
     },
     "preview": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
       "channel": "preview",
@@ -20,6 +29,7 @@
       }
     },
     "production": {
+      "extends": "base",
       "autoIncrement": true,
       "channel": "production",
       "env": {

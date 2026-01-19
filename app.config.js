@@ -79,7 +79,6 @@ export default ({ config }) => {
       [
         "@rnmapbox/maps",
         {
-          RNMapboxMapsDownloadToken: process.env.MAPBOX_SECRET_TOKEN || "sk.placeholder_secret_token",
           RNMapboxMapsVersion: "11.0.0"
         }
       ],
