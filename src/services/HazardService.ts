@@ -219,7 +219,7 @@ export class HazardService {
         verification_count, original_lat, original_lon, decay_rate, expires_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        report.id,
+        report.id ?? "",
         report.type,
         report.description ?? null,
         report.lat,

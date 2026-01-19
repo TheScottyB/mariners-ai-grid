@@ -16,7 +16,8 @@
       "Bash(python -m pytest:*)",
       "Bash(npx tsx:*)",
       "Bash(lsof:*)",
-      "Bash(xargs kill -9)"
+      "Bash(xargs kill -9)",
+      "Bash(gh repo create:*)"
     ]
   }
 }
