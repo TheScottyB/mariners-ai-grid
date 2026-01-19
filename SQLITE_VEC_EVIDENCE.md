@@ -130,6 +130,9 @@ const extension = SQLite.bundledExtensions['sqlite-vec'];
 await db.loadExtensionAsync(extension.libPath, extension.entryPoint);
 ```
 
+> **⚠️ Note on Implementation Details:**
+> The public API requires explicit `loadExtensionAsync()` calls per database connection. It is **uncertain** whether Expo's internal implementation uses `sqlite3_auto_extension()` under the hood. To verify this would require examining the Swift source code in `packages/expo-sqlite/ios/SQLiteModule.swift` in the expo/expo repository. The documentation only shows the explicit loading approach.
+
 ### Lines of Code:
 - Config: 5 lines
 - Usage: 3 lines

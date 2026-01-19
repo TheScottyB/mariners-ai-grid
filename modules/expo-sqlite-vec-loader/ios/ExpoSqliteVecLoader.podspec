@@ -16,8 +16,17 @@ Pod::Spec.new do |s|
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
-  s.dependency 'sqlite-vec'
+  s.dependency 'ExpoSQLite'
+  
+  # We rely on the app to link the sqlite-vec binary via the config plugin
+  # s.dependency 'sqlite-vec'
 
-  # Podfile's source_files automatically includes this directory
+  # Force search paths to find ExpoSQLite's vendored headers if they exist
+  s.pod_target_xcconfig = {
+    'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/Headers/Public/ExpoSQLite" "$(PODS_ROOT)/Headers/Public/ExpoModulesCore"'
+  }
+
+  # Swift/ObjC source files
   s.source_files = "**/*.{h,m,swift}"
+  s.public_header_files = "**/*.h"
 end
