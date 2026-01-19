@@ -10,6 +10,7 @@
     "prebuild:ios": "expo prebuild --clean --platform ios",
     "prebuild:android": "expo prebuild --clean --platform android",
     "clean": "rm -rf android ios node_modules && pnpm install",
+    "nuke": "rm -rf android ios node_modules .expo ~/Library/Developer/Xcode/DerivedData/MarinersAIGrid-* && watchman watch-del-all && pnpm install && npx expo prebuild --clean",
     "test": "vitest run",
     "test:ui": "vitest run src/components",
     "test:logic": "vitest run src/services",
