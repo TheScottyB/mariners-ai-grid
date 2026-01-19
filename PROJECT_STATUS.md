@@ -22,8 +22,8 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 *   **State Management:** TanStack Query (server/weather state) + Zustand (client UI state).
 *   **Maps:** Mapbox GL Native (`@rnmapbox/maps`).
 *   **Storage:** `expo-sqlite/vec` (Vector storage for social hazards), Parquet (Weather Seeds).
-*   **Inference:** `MarinerInference.ts` utilizing `onnxruntime-react-native` for NPU-accelerated GraphCast execution.
-*   **Social:** `SocialLayer.ts` for spatial hazard queries using `expo-sqlite/vec`.
+*   **Inference:** `MarinerInference.ts` utilizing `onnxruntime-react-native` for NPU-accelerated GraphCast execution (implemented).
+*   **Social:** `SocialLayer.ts` and `GridSync.ts` for spatial hazard queries and fleet-wide CC0 synchronization (implemented).
 
 ### **B. The Conductor (Backend/Slicer)**
 *   **Language:** Python 3.12+ (Managed via `uv`).
@@ -55,8 +55,10 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
     *   CLI tool (`mag-slicer`) operational with detailed cost estimates.
     *   Production-grade compression (Quantization) verified via "Truth Layer Audit".
 *   **Mobile Core:**
-    *   `MarinerInference.ts` scaffolded for NPU execution.
-    *   `SocialLayer.ts` scaffolded for vector search.
+    *   `MarinerInference.ts`: Adoption of `expo-file-system/next` for bridge-less binary reading.
+    *   `SocialLayer.ts`: Vector-based 'Waze' hazard search using `expo-sqlite/vec`.
+    *   `VesselSnapshot.ts`: Privacy-preserving "Truth Layer" capture of divergence events.
+    *   `GridSync.ts`: Fleet-wide CC0 synchronization with background fetch support.
     *   **PatternAlert UI:** Tactical display with double-tap haptic feedback for DIVERGENT consensus.
 *   **Integration:**
     *   `SeedUploader.ts` utility for cloud distribution.
@@ -84,9 +86,10 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 
 ## 5. Next Immediate Actions (for AI Agents)
 
-1.  **End-to-End Verification:** Run the full pipeline using a real AIFS download and visualize the first AI-generated wind barb on the mobile map.
+1.  **End-to-End Verification:** Perform a full pipeline test using a real AIFS download and visualize the first AI-generated wind barb on the mobile map.
 2.  **UX Polish:** Add haptic feedback on hazard report submission; implement route waypoint input UI.
-3.  **Refine Slicer fallbacks:** Implement logic for physics-based HRES fallback if AIFS open data buckets are delayed.
+3.  **App Store Readiness:** Finalize marketing metadata and prepare EAS build profiles for the July 2026 beta launch.
+4.  **Refine Slicer fallbacks:** Implement logic for physics-based HRES fallback if AIFS open data buckets are delayed.
 
 ---
 

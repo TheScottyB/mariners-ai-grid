@@ -11,13 +11,15 @@ import { TelemetrySnapshot } from './PatternMatcher';
  * - Exponential backoff for reconnection
  * - Stale data watchdog (10s timeout)
  * - Automatic "Anchor Watch" low-power polling
+ * - Emergency "Sensor Overdrive" mode (1Hz -> 10Hz polling)
  */
 export class SignalKBridge {
   private ws: ReconnectingWebSocket | null = null;
   private serverUrl: string = "ws://localhost:3000/signalk/v1/stream"; // Default to localhost for sim
   private watchdogTimer: NodeJS.Timeout | null = null;
   private isConnected: boolean = false;
-  
+  private pollingRateHz: number = 1; // Normal: 1Hz, Emergency: 10Hz
+
   // Accumulated telemetry state
   private currentTelemetry: Partial<TelemetrySnapshot> & { windU?: number; windV?: number } = {
     timestamp: Date.now(),
@@ -25,20 +27,22 @@ export class SignalKBridge {
 
   private onTelemetrySnapshot?: (snapshot: TelemetrySnapshot) => void;
   private onConnectionStatus?: (status: 'connected' | 'disconnected' | 'stale') => void;
+  private onDataReceived?: (data: any) => void;
 
   /**
    * Initializes the connection and subscribes to marine-critical data.
    */
   async connect(onDataReceived: (data: any) => void) {
+    this.onDataReceived = onDataReceived;
     const state = await Network.getNetworkStateAsync();
-    
+
     if (!state.isConnected) {
-      console.warn("⚠️ No network connection. Telemetry paused.");
+      console.warn("No network connection. Telemetry paused.");
       return;
     }
 
-    console.log(`⚓ Attempting connection to Signal K: ${this.serverUrl}`);
-    
+    console.log(`Attempting connection to Signal K: ${this.serverUrl}`);
+
     // Hardened WebSocket configuration
     this.ws = new ReconnectingWebSocket(this.serverUrl, [], {
       WebSocket: WebSocket,
@@ -49,27 +53,11 @@ export class SignalKBridge {
     });
 
     this.ws.onopen = () => {
-      console.log("⚓ Connected to Signal K / NMEA 2000 Bridge");
+      console.log("Connected to Signal K / NMEA 2000 Bridge");
       this.isConnected = true;
       this.notifyStatus('connected');
       this.resetWatchdog();
-
-      // Subscribe to all paths needed for PatternMatcher
-      const subscription = {
-        context: "vessels.self",
-        subscribe: [
-          { path: "navigation.position", period: 1000 },
-          { path: "navigation.headingTrue", period: 1000 },
-          { path: "navigation.speedOverGround", period: 1000 },
-          { path: "environment.wind.speedApparent", period: 1000 },
-          { path: "environment.wind.angleApparent", period: 1000 },
-          { path: "environment.wind.speedTrue", period: 1000 },
-          { path: "environment.wind.u10", period: 1000 }, // For consensus check
-          { path: "environment.wind.v10", period: 1000 }, // For consensus check
-          { path: "environment.outside.pressure", period: 5000 }, // Critical for storm detection
-        ]
-      };
-      this.ws?.send(JSON.stringify(subscription));
+      this.sendSubscription();
     };
 
     this.ws.onmessage = (event) => {
@@ -77,7 +65,7 @@ export class SignalKBridge {
       try {
         const delta = JSON.parse(event.data);
         this.processDelta(delta);
-        onDataReceived(delta);
+        this.onDataReceived?.(delta);
 
         if (this.hasSufficientTelemetry()) {
           this.emitTelemetrySnapshot();
@@ -122,6 +110,59 @@ export class SignalKBridge {
 
   onStatusChange(callback: (status: 'connected' | 'disconnected' | 'stale') => void) {
     this.onConnectionStatus = callback;
+  }
+
+  /**
+   * Emergency "Sensor Overdrive" mode - boost polling from 1Hz to 10Hz.
+   * This captures rapid pressure drops (dP/dt) characteristic of micro-bursts or squall lines.
+   */
+  setPollingRate(rateHz: number): void {
+    if (rateHz === this.pollingRateHz) return;
+
+    const previousRate = this.pollingRateHz;
+    this.pollingRateHz = rateHz;
+
+    console.log(`[SignalKBridge] Polling rate: ${previousRate}Hz -> ${rateHz}Hz`);
+
+    // Re-subscribe with new polling rate
+    if (this.isConnected && this.ws) {
+      this.sendSubscription();
+    }
+  }
+
+  /**
+   * Get current polling rate.
+   */
+  getPollingRate(): number {
+    return this.pollingRateHz;
+  }
+
+  /**
+   * Send Signal K subscription with current polling rate.
+   */
+  private sendSubscription(): void {
+    if (!this.ws) return;
+
+    const periodMs = Math.round(1000 / this.pollingRateHz);
+    const pressurePeriod = Math.max(periodMs, 500); // Pressure sensor min 500ms
+
+    const subscription = {
+      context: "vessels.self",
+      subscribe: [
+        { path: "navigation.position", period: periodMs },
+        { path: "navigation.headingTrue", period: periodMs },
+        { path: "navigation.speedOverGround", period: periodMs },
+        { path: "environment.wind.speedApparent", period: periodMs },
+        { path: "environment.wind.angleApparent", period: periodMs },
+        { path: "environment.wind.speedTrue", period: periodMs },
+        { path: "environment.wind.u10", period: periodMs },
+        { path: "environment.wind.v10", period: periodMs },
+        { path: "environment.outside.pressure", period: pressurePeriod },
+      ]
+    };
+
+    this.ws.send(JSON.stringify(subscription));
+    console.log(`[SignalKBridge] Subscribed at ${this.pollingRateHz}Hz (period: ${periodMs}ms)`);
   }
 
   private notifyStatus(status: 'connected' | 'disconnected' | 'stale') {
