@@ -33,14 +33,16 @@ def main():
 @click.option("--hours", type=int, default=72, help="Forecast hours")
 @click.option("--step", type=int, default=3, help="Time step hours")
 @click.option("--variables", type=str, default="standard", help="Variable set")
+@click.option("--model", "model_type", type=click.Choice(["ifs", "aifs", "aifs-ens"]), default="ifs", help="ECMWF Model type")
 @click.option("--format", "output_format", type=click.Choice(["parquet", "protobuf", "both"]), default="protobuf", help="Output format")
 @click.option("--output", "-o", type=Path, default=Path("./seeds"), help="Output dir")
 @click.option("--offline", is_flag=True, help="Use mock data")
 def slice(lat: float, lon: float, radius: float, hours: int, step: int,
-          variables: str, output_format: str, output: Path, offline: bool):
+          variables: str, model_type: str, output_format: str, output: Path, offline: bool):
     """Extract a regional weather slice."""
     from slicer.core import BoundingBox, ECMWFHRESSlicer
     from slicer.aifs import AIFSSlicer
+    from slicer.ifs import IFSSlicer
     from slicer.export import SeedExporter, compare_formats
     from slicer.variables import MINIMAL_VARIABLES, STANDARD_VARIABLES, FULL_VARIABLES
 
@@ -59,6 +61,15 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
         slicer = ECMWFHRESSlicer(
             cache_dir=output / ".cache",
             offline_mode=True,
+        )
+    elif model_type == "ifs":
+        slicer = IFSSlicer(
+            cache_dir=output / ".cache",
+        )
+    elif model_type == "aifs-ens":
+        slicer = AIFSSlicer(
+            cache_dir=output / ".cache",
+            ensemble_mode=True,
         )
     else:
         slicer = AIFSSlicer(
@@ -86,6 +97,13 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
             var_list = [v.strip() for v in variables.split(",")]
 
         if offline:
+            seed = slicer.slice(
+                bbox=bbox,
+                forecast_hours=hours,
+                time_step_hours=step,
+                variables=var_list,
+            )
+        elif model_type == "ifs":
             seed = slicer.slice(
                 bbox=bbox,
                 forecast_hours=hours,

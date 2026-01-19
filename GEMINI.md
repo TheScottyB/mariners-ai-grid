@@ -54,9 +54,11 @@ Our quantization strategy is "Perfectly Tuned" for maritime use:
 *   **Direction:** 5° precision (20% compression gain).
 *   **Result:** 10GB Global GRIB -> **2.1 MB** Regional Seed.
 
-### 3. Open Data Advantage (`slicer/aifs.py`)
+### 3. Open Data Advantage (`slicer/aifs.py` & `slicer/ifs.py`)
 Leverages the Oct 1, 2025 ECMWF Open Data transition.
-*   **Resolution:** Defaults to `0.1` (9km).
+*   **IFS HRES:** Provides the native **9km resolution** physics-based baseline. Best for tactical high-res navigation.
+*   **AIFS:** Provides the **28km resolution** AI-driven model. Best for fast global trends and hurricane tracking.
+*   **AIFS-ENS:** Provides the **Ensemble AI** model. Best for probabilistic risk assessment ("30% chance of gale").
 *   **Fallback:** If `00Z` run is missing, automatically falls back to `12Z` (Yesterday).
 
 ## 🚀 Common Workflows

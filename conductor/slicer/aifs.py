@@ -35,10 +35,13 @@ class AIFSSlicer:
     # AIFS Native Resolution is ~9km (0.1 deg) as of Oct 2025 Open Data update
     RESOLUTION = 0.1
     
-    def __init__(self, cache_dir: Optional[Path] = None):
+    def __init__(self, cache_dir: Optional[Path] = None, ensemble_mode: bool = False):
         self.cache_dir = cache_dir or Path("/tmp/mag_cache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.client = Client("ecmwf", model="aifs-single")
+        self.ensemble_mode = ensemble_mode
+        
+        model_name = "aifs-ens" if ensemble_mode else "aifs-single"
+        self.client = Client("ecmwf", model=model_name)
 
     def slice(
         self,
@@ -68,15 +71,15 @@ class AIFSSlicer:
         
         # Surface
         sfc_params = ["msl", "10u", "10v", "2t"] 
-        target_sfc = self.cache_dir / "aifs_sfc.grib2"
+        target_sfc = self.cache_dir / f"{self.client.model}_sfc.grib2"
         
         # Upper Air
         pl_params = ["z", "q", "t", "u", "v"] 
         levels = [1000, 850, 500] 
-        target_pl = self.cache_dir / "aifs_pl.grib2"
+        target_pl = self.cache_dir / f"{self.client.model}_pl.grib2"
         
         try:
-            logger.info("Attempting to fetch latest AIFS run (00Z)...")
+            logger.info(f"Attempting to fetch latest {self.client.model} run (00Z)...")
             self._fetch_files(date=0, time=0, steps=steps, sfc_params=sfc_params, pl_params=pl_params, levels=levels, target_sfc=target_sfc, target_pl=target_pl)
             model_run_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         except Exception as e:
@@ -110,9 +113,9 @@ class AIFSSlicer:
         times = [model_run_date + timedelta(hours=h) for h in steps]
         
         return WeatherSeed(
-            seed_id=f"aifs_seed_{model_run_date.strftime('%Y%m%d%H')}",
+            seed_id=f"{self.client.model}_seed_{model_run_date.strftime('%Y%m%d%H')}",
             created_at=datetime.now(timezone.utc),
-            model_source="ecmwf_aifs_open",
+            model_source=f"ecmwf_{self.client.model}_open",
             model_run=model_run_date,
             bounding_box=buffered_bbox,
             resolution_deg=self.RESOLUTION,
@@ -123,7 +126,7 @@ class AIFSSlicer:
             latitudes=ds_sliced.latitude.values,
             longitudes=ds_sliced.longitude.values,
             times=times,
-            metadata={"buffered": "true", "buffer_deg": str(BUFFER_DEG)}
+            metadata={"buffered": "true", "buffer_deg": str(BUFFER_DEG), "model": self.client.model}
         )
 
     def _fetch_files(self, date, time, steps, sfc_params, pl_params, levels, target_sfc, target_pl):
