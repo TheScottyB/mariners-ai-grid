@@ -217,7 +217,7 @@ class SeedExporter:
             "time_step_hours": seed.time_step_hours,
             "times": [t.isoformat() for t in seed.times],
             "shape": list(seed.shape),
-            "variables": list(seed.variables.keys()),
+            "variables": sorted(seed.variables.keys()),
             "latitudes": seed.latitudes.tolist(),
             "longitudes": seed.longitudes.tolist(),
         }

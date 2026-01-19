@@ -305,7 +305,7 @@ class TestSeedExporter:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             exporter = SeedExporter(Path(tmpdir))
-            path, _ = exporter.to_protobuf(original)
+            path, _ = exporter.to_protobuf(original, quantize=False)
 
             # Read back
             restored = SeedExporter.read_protobuf_seed(path)

@@ -177,18 +177,18 @@ conductor/slicer/
 ### Quick Start
 
 ```bash
-# Install dependencies
+# Install dependencies (requires uv)
 cd conductor
-pip install -e .
+uv sync --extra dev
 
 # Run demo (Pacific crossing scenario)
-mag-slicer demo
+uv run mag-slicer demo
 
 # Extract custom region
-mag-slicer slice --lat 21.3 --lon -157.8 --radius 500 --hours 72
+uv run mag-slicer slice --lat 21.3 --lon -157.8 --radius 500 --hours 72
 
 # Estimate size before download
-mag-slicer estimate --lat 37.0 --lon -122.4 --radius 300
+uv run mag-slicer estimate --lat 37.0 --lon -122.4 --radius 300
 ```
 
 ### Key Capabilities
