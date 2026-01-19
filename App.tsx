@@ -99,8 +99,28 @@ export default function App() {
       // Initialize Pattern Matcher
       const matcher = new PatternMatcher(db);
       await matcher.initialize();
-      matcher.start((alert) => {
+      matcher.start(async (alert) => {
         if (acknowledgedAlerts.has(alert.id)) return;
+
+        // Generate Consensus Data using Vector DB Vibe Search
+        if (vecDbRef.current) {
+          try {
+            const similar = await vecDbRef.current.vibeSearch(alert.currentConditions, { limit: 5 });
+            const consensusData: ConsensusData = {
+              localMatch: {
+                patternId: alert.matchedPattern.id,
+                label: alert.matchedPattern.label || 'Unknown Pattern',
+                similarity: alert.matchedPattern.similarity,
+                outcome: alert.matchedPattern.outcome || 'Uncertain Outcome',
+              },
+              vibeSearchResults: similar,
+            };
+            setConsensusMap(prev => new Map(prev).set(alert.id, consensusData));
+          } catch (e) {
+            console.warn('[App] Consensus generation failed:', e);
+          }
+        }
+
         setActiveAlerts(prev => [alert, ...prev.filter(a => a.id !== alert.id)]);
       });
       patternMatcherRef.current = matcher;
