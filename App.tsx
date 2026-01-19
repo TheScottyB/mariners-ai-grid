@@ -10,8 +10,10 @@ import MarinerMap, { VesselLocation } from './src/components/MarinerMap';
 import { HazardReportingModal } from './src/components/HazardReportingModal';
 import { PatternAlertStack, ConsensusData } from './src/components/PatternAlert';
 import { useSeedManager } from './src/hooks/useSeedManager';
-import { PatternMatcher, PatternAlert as PatternAlertType } from './src/services/PatternMatcher';
+import { PatternMatcher, PatternAlert as PatternAlertType, TelemetrySnapshot } from './src/services/PatternMatcher';
 import { VecDB, AtmosphericVector } from './src/services/VecDB';
+import { VesselSnapshot } from './src/services/VesselSnapshot';
+import { GridSync, GridHazard } from './src/services/GridSync';
 import { MarineHazard } from './src/utils/geoUtils';
 import type { FeatureCollection, Point } from 'geojson';
 
@@ -41,7 +43,10 @@ export default function App() {
   const skBridge = useRef(new SignalKBridge());
   const patternMatcherRef = useRef<PatternMatcher | null>(null);
   const vecDbRef = useRef<VecDB | null>(null);
+  const vesselSnapshotRef = useRef<VesselSnapshot | null>(null);
+  const gridSyncRef = useRef<GridSync | null>(null);
   const dbRef = useRef<SQLite.SQLiteDatabase | null>(null);
+  const lastTelemetryRef = useRef<TelemetrySnapshot | null>(null);
 
   // Weather Seed Manager
   const seedManager = useSeedManager({
@@ -107,6 +112,33 @@ export default function App() {
       next.set(alert.id, consensus);
       return next;
     });
+
+    // Capture divergence snapshot for grid learning
+    const consensusLevel = consensus.graphCastPrediction
+      ? (consensus.localMatch.outcome.toLowerCase().includes('gale') !==
+         consensus.graphCastPrediction.outcome.toLowerCase().includes('gale')
+          ? 'divergent'
+          : 'agree')
+      : 'unknown';
+
+    if (consensusLevel === 'divergent' && vesselSnapshotRef.current && lastTelemetryRef.current) {
+      const currentVector = patternMatcherRef.current?.getCurrentConditions();
+      if (currentVector) {
+        vesselSnapshotRef.current.captureDivergence(
+          lastTelemetryRef.current,
+          currentVector,
+          consensus,
+          consensus.graphCastPrediction ? {
+            windSpeed: 10, // Would come from seed
+            pressure: 1013,
+            validTime: consensus.graphCastPrediction.validTime,
+            model: 'ECMWF-AIFS-9km',
+          } : undefined
+        ).then(snapshot => {
+          console.log(`[App] Captured divergence snapshot: ${snapshot.snapshot_id}`);
+        }).catch(e => console.warn('[App] Failed to capture snapshot:', e));
+      }
+    }
   }, [seedManager.activeSeed, seedManager.windGeoJSON, seedManager.forecastValidTime, vesselLocation]);
 
   // Build consensus when alerts change
@@ -128,6 +160,31 @@ export default function App() {
       const vecDb = new VecDB(db);
       await vecDb.initialize().catch(e => console.warn('[App] VecDB init (extension may not be available):', e));
       vecDbRef.current = vecDb;
+
+      // Initialize VesselSnapshot for divergence capture
+      const vesselSnapshot = new VesselSnapshot(db);
+      await vesselSnapshot.initialize().catch(e => console.warn('[App] VesselSnapshot init failed:', e));
+      vesselSnapshotRef.current = vesselSnapshot;
+
+      // Initialize GridSync for fleet coordination
+      const gridSync = new GridSync(db, vesselSnapshot, vecDb);
+      await gridSync.initialize().catch(e => console.warn('[App] GridSync init failed:', e));
+      await gridSync.registerBackgroundSync().catch(e => console.warn('[App] Background sync registration failed:', e));
+      gridSyncRef.current = gridSync;
+
+      // Set up GridSync callbacks
+      gridSync.onEvents({
+        onHazardReceived: (hazard) => {
+          console.log(`[App] Received grid hazard: ${hazard.type} at ${hazard.lat}, ${hazard.lon}`);
+          // Could update map with grid hazards here
+        },
+        onPatternLearned: (pattern) => {
+          console.log(`[App] Learned new pattern: ${pattern.label}`);
+        },
+        onSyncComplete: (result) => {
+          console.log(`[App] Grid sync: ${result.uploaded} up, ${result.downloaded} down, ${result.hazardsReceived} hazards`);
+        },
+      });
 
       // 2. Initialize Identity
       const idService = IdentityService.getInstance();
@@ -183,6 +240,12 @@ export default function App() {
         // Connect Signal K telemetry to Pattern Matcher
         skBridge.current.onTelemetry((snapshot) => {
           matcher.processTelemetry(snapshot);
+          lastTelemetryRef.current = snapshot;
+
+          // Update GridSync position for regional sync
+          if (gridSyncRef.current) {
+            gridSyncRef.current.setPosition(snapshot.position.lat, snapshot.position.lon);
+          }
         });
 
         patternMatcherRef.current = matcher;

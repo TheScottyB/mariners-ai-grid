@@ -23,7 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { HazardService, HazardType } from '../services/HazardService';
-import { getDeviceId } from '../services/IdentityService';
+import { IdentityService } from '../services/IdentityService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -155,7 +155,7 @@ export const HazardReportSheet = forwardRef<HazardReportSheetRef, HazardReportSh
           }
 
           // Get device ID for reporter attribution
-          const deviceId = await getDeviceId();
+          const deviceId = IdentityService.getInstance().getDeviceId();
 
           // Initialize hazard service and report
           const hazardService = new HazardService(db, deviceId);

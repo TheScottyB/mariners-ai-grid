@@ -377,7 +377,7 @@ class TestIntegration:
             assert stats.output_bytes < 10 * 1024 * 1024
 
             # Starlink cost should be reasonable
-            assert stats.estimated_transfer_cost_usd < 50.0
+            assert stats.cost_estimates.get("starlink", 0) < 50.0
 
     def test_mariner_code_compliance(self):
         """Verify compliance with Mariner's Code governance"""

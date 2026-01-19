@@ -11,7 +11,12 @@
       "Bash(npx expo install:*)",
       "Bash(npm install:*)",
       "Bash(npx tailwindcss init)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(python -m pytest:*)",
+      "Bash(npx tsx:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill -9)"
     ]
   }
 }

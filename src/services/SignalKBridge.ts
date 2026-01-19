@@ -16,10 +16,10 @@ import { TelemetrySnapshot } from './PatternMatcher';
  */
 export class SignalKBridge {
   private ws: ReconnectingWebSocket | null = null;
-  private serverUrl: string = "ws://signalk.local:3000/signalk/v1/stream";
+  private serverUrl: string = "ws://localhost:3000/signalk/v1/stream";
 
   // Accumulated telemetry state (Signal K sends incremental updates)
-  private currentTelemetry: Partial<TelemetrySnapshot> = {
+  private currentTelemetry: Partial<TelemetrySnapshot> & { windU?: number; windV?: number } = {
     timestamp: Date.now(),
   };
 
@@ -44,7 +44,7 @@ export class SignalKBridge {
     
     // Using native WebSocket constructor via ReconnectingWebSocket wrapper
     this.ws = new ReconnectingWebSocket(this.serverUrl, [], {
-      constructor: WebSocket,
+      WebSocket: WebSocket,
       connectionTimeout: 5000,
     });
 
@@ -65,6 +65,11 @@ export class SignalKBridge {
           { path: "environment.wind.angleApparent", period: 1000 },
           { path: "environment.wind.speedTrue", period: 1000 },
           { path: "environment.wind.angleTrueWater", period: 1000 },
+          { path: "environment.wind.angleTrueGround", period: 1000 },
+
+          // U/V wind components (from MockNMEAStreamer for testing)
+          { path: "environment.wind.u10", period: 1000 },
+          { path: "environment.wind.v10", period: 1000 },
 
           // Atmospheric
           { path: "environment.outside.pressure", period: 5000 },
@@ -169,6 +174,22 @@ export class SignalKBridge {
           case 'environment.wind.angleTrueWater':
             this.currentTelemetry.trueWindAngle = this.radToDeg(val.value);
             break;
+          case 'environment.wind.angleTrueGround':
+            // Use ground-referenced angle if water-referenced not available
+            if (this.currentTelemetry.trueWindAngle === undefined) {
+              this.currentTelemetry.trueWindAngle = this.radToDeg(val.value);
+            }
+            break;
+
+          // U/V components (from MockNMEAStreamer) - convert to speed/angle
+          case 'environment.wind.u10':
+            this.currentTelemetry.windU = val.value; // m/s
+            this.updateWindFromUV();
+            break;
+          case 'environment.wind.v10':
+            this.currentTelemetry.windV = val.value; // m/s
+            this.updateWindFromUV();
+            break;
 
           // Atmospheric
           case 'environment.outside.pressure':
@@ -233,6 +254,29 @@ export class SignalKBridge {
    */
   getCurrentTelemetry(): Partial<TelemetrySnapshot> {
     return { ...this.currentTelemetry };
+  }
+
+  /**
+   * Convert U/V wind components to speed and angle.
+   * Called when u10 or v10 values are received.
+   */
+  private updateWindFromUV(): void {
+    const u = this.currentTelemetry.windU;
+    const v = this.currentTelemetry.windV;
+
+    if (u !== undefined && v !== undefined) {
+      // Calculate wind speed from components (m/s to knots)
+      const speedMs = Math.sqrt(u * u + v * v);
+      this.currentTelemetry.trueWindSpeed = this.msToKnots(speedMs);
+
+      // Calculate wind direction (meteorological convention: from direction)
+      // atan2(u, v) gives direction wind is going TO, add 180° for FROM
+      const angleRad = Math.atan2(u, v);
+      let angleDeg = this.radToDeg(angleRad) + 180;
+      if (angleDeg >= 360) angleDeg -= 360;
+      if (angleDeg < 0) angleDeg += 360;
+      this.currentTelemetry.trueWindAngle = angleDeg;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────

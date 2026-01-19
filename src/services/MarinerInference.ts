@@ -47,7 +47,7 @@ export class MarinerInference {
       // This bypasses the Base64 bridge for 10x faster ingestion.
       const file = new File(seedFileUri);
       const fh = file.open();
-      const buffer = Buffer.from(fh.readBytes(fh.size));
+      const buffer = Buffer.from(fh.readBytes(fh.size ?? 0));
       
       // 2. Prepare Tensors (U/V Wind, Pressure, Geopotential, etc.)
       const inputFeeds = await this.prepareTensors(buffer);

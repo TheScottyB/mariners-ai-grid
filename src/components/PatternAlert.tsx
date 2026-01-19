@@ -312,6 +312,18 @@ export const PatternAlertCard: React.FC<PatternAlertProps> = ({
       } else if (alert.level === 'warning') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
+
+      // Extra haptic feedback for DIVERGENT consensus (local vs GraphCast disagree)
+      const consensusLevel = calculateConsensusLevel(consensus);
+      if (consensusLevel === 'disagree') {
+        // Double-tap haptic pattern for divergence
+        setTimeout(() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          setTimeout(() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          }, 150);
+        }, 300);
+      }
     }
 
     // Pulse animation for critical alerts

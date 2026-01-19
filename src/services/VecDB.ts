@@ -46,7 +46,7 @@ export interface AtmosphericPattern {
   lon: number;
   label?: string;           // Human-readable label (e.g., "Pre-squall pattern")
   outcome?: string;         // What happened after this pattern
-  source: 'graphcast' | 'observation' | 'historical';
+  source: 'graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned';
 }
 
 /**
@@ -159,7 +159,7 @@ export class VecDB {
       lon: number;
       label?: string;
       outcome?: string;
-      source: 'graphcast' | 'observation' | 'historical';
+      source: 'graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned';
     }
   ): Promise<void> {
     if (!this.initialized) {
@@ -259,7 +259,7 @@ export class VecDB {
       lon: row.lon,
       label: row.label ?? undefined,
       outcome: row.outcome ?? undefined,
-      source: row.source as 'graphcast' | 'observation' | 'historical',
+      source: row.source as 'graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned',
       similarity: 1 - row.distance,
     }));
   }
@@ -340,7 +340,7 @@ export class VecDB {
       lon: row.lon,
       label: row.label ?? undefined,
       outcome: row.outcome ?? undefined,
-      source: row.source as 'graphcast' | 'observation' | 'historical',
+      source: row.source as 'graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned',
       similarity: 1 - row.distance,
       distanceNm: this.haversineNm(centerLat, centerLon, row.lat, row.lon),
     }));
@@ -360,7 +360,7 @@ export class VecDB {
       lon?: number;
       radiusNm?: number;
       timeRangeMs?: number; // Only search patterns from this time window
-      sourceFilter?: ('graphcast' | 'observation' | 'historical')[];
+      sourceFilter?: ('graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned')[];
       outcomeFilter?: string; // Only patterns with this outcome (e.g., "gale")
       limit?: number;
     } = {}
@@ -463,7 +463,7 @@ export class VecDB {
       lon: row.lon,
       label: row.label ?? undefined,
       outcome: row.outcome ?? undefined,
-      source: row.source as 'graphcast' | 'observation' | 'historical',
+      source: row.source as 'graphcast' | 'observation' | 'historical' | 'grid_fleet' | 'grid_learned',
       similarity: 1 - row.distance,
       distanceNm: lat !== undefined && lon !== undefined
         ? this.haversineNm(lat, lon, row.lat, row.lon)
@@ -597,8 +597,8 @@ export class VecDB {
   /**
    * Convert Float32Array to Blob for sqlite-vec
    */
-  private float32ToBlob(arr: Float32Array): ArrayBuffer {
-    return arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength);
+  private float32ToBlob(arr: Float32Array): Uint8Array {
+    return new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
   }
 
   /**

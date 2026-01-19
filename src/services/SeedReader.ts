@@ -20,7 +20,7 @@ export class SeedReader {
       
       // 1. Read file as Base64 (Expo limitation for binary)
       const base64Data = await FileSystem.readAsStringAsync(fileUri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64',
       });
       
       // 2. Convert to Uint8Array
