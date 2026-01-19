@@ -21,6 +21,7 @@ export default ({ config }) => {
     name: getAppName(),
     slug: "mariners-ai-grid",
     version: "1.0.0",
+    buildCacheProvider: "eas",
     orientation: "portrait",
     icon: "./assets/app-icon.png",
     userInterfaceStyle: "automatic",

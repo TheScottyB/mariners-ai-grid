@@ -19,7 +19,14 @@ fi
 
 echo "✅ Environment variables verified."
 
-# 2. Build Selection
+# 2. Native Fingerprint Check
+echo ""
+echo "🔍 Checking Native Fingerprint..."
+FINGERPRINT=$(npx expo-fingerprint /Users/scottybe/workspace/mariners-ai-grid)
+echo "   Fingerprint: $FINGERPRINT"
+echo "   (Remote cache will be used if matching build artifacts exist in EAS)"
+
+# 3. Build Selection
 echo ""
 echo "Select Build Target:"
 echo "1) 🛠️  Simulator (Development Build) - For local testing"
