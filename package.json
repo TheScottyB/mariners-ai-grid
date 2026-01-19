@@ -12,6 +12,7 @@
     "@bufbuild/protobuf": "^2.10.2",
     "@gorhom/bottom-sheet": "^5.2.8",
     "@rnmapbox/maps": "^10.2.10",
+    "apache-arrow": "^21.1.0",
     "expo": "~54.0.31",
     "expo-battery": "~10.0.8",
     "expo-crypto": "~15.0.8",

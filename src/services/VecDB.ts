@@ -267,14 +267,21 @@ export class VecDB {
   /**
    * Find patterns similar to query within a geographic bounding box.
    * Combines spatial filtering with vector similarity.
+   *
+   * THE HYBRID QUERY - Optimized for MVP:
+   * Phase 1: Fast geographic filter using bounding box index
+   * Phase 2: High-dimensional vector similarity using sqlite-vec
+   *
+   * This is the "Does this weather feel like the storm we had in 2024?" query.
    */
   async findSimilarNearby(
     query: AtmosphericVector | Float32Array,
     centerLat: number,
     centerLon: number,
     radiusDegrees: number,
-    limit: number = 10
-  ): Promise<Array<AtmosphericPattern & { similarity: number }>> {
+    limit: number = 10,
+    minSimilarity: number = 0.6
+  ): Promise<Array<AtmosphericPattern & { similarity: number; distanceNm: number }>> {
     if (!this.initialized) {
       throw new Error('[VecDB] Not initialized. Call initialize() first.');
     }
@@ -283,6 +290,10 @@ export class VecDB {
       ? query
       : this.vectorToFloat32(query);
 
+    // The Hybrid Query:
+    // 1. WHERE clause uses the idx_patterns_location index for fast geo-filtering
+    // 2. vec_distance_cosine computes similarity on the filtered subset
+    // 3. Results sorted by atmospheric similarity, not geographic distance
     const results = await this.db.getAllAsync<{
       id: string;
       distance: number;
@@ -306,6 +317,7 @@ export class VecDB {
        JOIN atmospheric_patterns p ON v.id = p.id
        WHERE p.lat BETWEEN ? AND ?
          AND p.lon BETWEEN ? AND ?
+         AND vec_distance_cosine(v.embedding, vec_f32(?)) < ?
        ORDER BY distance ASC
        LIMIT ?`,
       [
@@ -314,6 +326,8 @@ export class VecDB {
         centerLat + radiusDegrees,
         centerLon - radiusDegrees,
         centerLon + radiusDegrees,
+        this.float32ToBlob(embedding),
+        1 - minSimilarity, // Convert similarity to distance threshold
         limit,
       ]
     );
@@ -328,6 +342,133 @@ export class VecDB {
       outcome: row.outcome ?? undefined,
       source: row.source as 'graphcast' | 'observation' | 'historical',
       similarity: 1 - row.distance,
+      distanceNm: this.haversineNm(centerLat, centerLon, row.lat, row.lon),
+    }));
+  }
+
+  /**
+   * Natural language "vibe search" - find historical weather that felt like this.
+   *
+   * Example: "Does this weather feel like the storm we had in 2024?"
+   *
+   * This is the agentic query that future AI assistants will use.
+   */
+  async vibeSearch(
+    currentConditions: AtmosphericVector,
+    options: {
+      lat?: number;
+      lon?: number;
+      radiusNm?: number;
+      timeRangeMs?: number; // Only search patterns from this time window
+      sourceFilter?: ('graphcast' | 'observation' | 'historical')[];
+      outcomeFilter?: string; // Only patterns with this outcome (e.g., "gale")
+      limit?: number;
+    } = {}
+  ): Promise<Array<AtmosphericPattern & {
+    similarity: number;
+    distanceNm?: number;
+    ageHours: number;
+  }>> {
+    if (!this.initialized) {
+      throw new Error('[VecDB] Not initialized. Call initialize() first.');
+    }
+
+    const {
+      lat,
+      lon,
+      radiusNm = 500,
+      timeRangeMs,
+      sourceFilter,
+      outcomeFilter,
+      limit = 10,
+    } = options;
+
+    const embedding = this.vectorToFloat32(currentConditions);
+    const radiusDegrees = radiusNm / 60; // 1 degree ≈ 60nm
+
+    // Build dynamic WHERE clause
+    const conditions: string[] = [];
+    const params: any[] = [this.float32ToBlob(embedding)];
+
+    // Geographic filter (if provided)
+    if (lat !== undefined && lon !== undefined) {
+      conditions.push('p.lat BETWEEN ? AND ?');
+      conditions.push('p.lon BETWEEN ? AND ?');
+      params.push(lat - radiusDegrees, lat + radiusDegrees);
+      params.push(lon - radiusDegrees, lon + radiusDegrees);
+    }
+
+    // Time filter
+    if (timeRangeMs) {
+      conditions.push('p.timestamp > ?');
+      params.push(Date.now() - timeRangeMs);
+    }
+
+    // Source filter
+    if (sourceFilter && sourceFilter.length > 0) {
+      conditions.push(`p.source IN (${sourceFilter.map(() => '?').join(', ')})`);
+      params.push(...sourceFilter);
+    }
+
+    // Outcome filter
+    if (outcomeFilter) {
+      conditions.push('p.outcome LIKE ?');
+      params.push(`%${outcomeFilter}%`);
+    }
+
+    const whereClause = conditions.length > 0
+      ? `WHERE ${conditions.join(' AND ')}`
+      : '';
+
+    params.push(limit);
+
+    const query = `
+      SELECT
+        v.id,
+        vec_distance_cosine(v.embedding, vec_f32(?)) as distance,
+        p.timestamp,
+        p.lat,
+        p.lon,
+        p.label,
+        p.outcome,
+        p.source
+      FROM atmospheric_vectors v
+      JOIN atmospheric_patterns p ON v.id = p.id
+      ${whereClause}
+      ORDER BY distance ASC
+      LIMIT ?
+    `;
+
+    // Reorder params: embedding first, then WHERE params, then LIMIT
+    const orderedParams = [params[0], ...params.slice(1, -1), params[params.length - 1]];
+
+    const results = await this.db.getAllAsync<{
+      id: string;
+      distance: number;
+      timestamp: number;
+      lat: number;
+      lon: number;
+      label: string | null;
+      outcome: string | null;
+      source: string;
+    }>(query, orderedParams);
+
+    const now = Date.now();
+
+    return results.map((row) => ({
+      id: row.id,
+      vector: new Float32Array(VECTOR_DIMENSION),
+      timestamp: row.timestamp,
+      lat: row.lat,
+      lon: row.lon,
+      label: row.label ?? undefined,
+      outcome: row.outcome ?? undefined,
+      source: row.source as 'graphcast' | 'observation' | 'historical',
+      similarity: 1 - row.distance,
+      distanceNm: lat !== undefined && lon !== undefined
+        ? this.haversineNm(lat, lon, row.lat, row.lon)
+        : undefined,
+      ageHours: (now - row.timestamp) / (1000 * 60 * 60),
     }));
   }
 
@@ -484,6 +625,26 @@ export class VecDB {
    */
   private normalizeWind(ms: number): number {
     return Math.max(-1, Math.min(1, ms / 40));
+  }
+
+  /**
+   * Calculate distance between two points in nautical miles.
+   * Uses Haversine formula for accuracy on spherical Earth.
+   */
+  private haversineNm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 3440.065; // Earth radius in nautical miles
+    const dLat = this.toRad(lat2 - lat1);
+    const dLon = this.toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private toRad(deg: number): number {
+    return deg * (Math.PI / 180);
   }
 }
 
