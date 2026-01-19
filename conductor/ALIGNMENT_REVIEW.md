@@ -11,13 +11,22 @@ Mentioning **"Open Source"** and **"CC0 Data"** in your metadata isn't just for 
 
 ---
 
-## 2. Final Project Sync: The Architect's View
+## 2. The Maverick Ethos: Local-First Strategy
+We made a strategic choice to defy the "Cloud-First" norm.
+*   **Why:** Sailors are offline. The Cloud is a myth at sea.
+*   **How:** By forcing the **`sqlite-vec`** extension into the native build (via Config Plugin), we enable **Vector Similarity Search** directly on the device's flash storage.
+*   **Result:** The app can answer *"Does this weather feel like the storm of 2024?"* without a single byte of satellite data. It is **Sovereign AI**.
+
+---
+
+## 3. Final Project Sync: The Architect's View
 
 We have now defined the core pillars of the system:
 
 ### The Tech Stack
 *   **Framework:** Expo SDK 54 (Managed + CNG)
 *   **Inference:** Local AI on NPU (via ONNX Runtime/CoreML)
+*   **Vector DB:** Native `sqlite-vec` for offline "Vibe Search"
 *   **Connectivity:** Signal K bridge for NMEA 2000 telemetry
 
 ### The Business Model

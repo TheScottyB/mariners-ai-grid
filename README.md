@@ -11,6 +11,18 @@ Mariner’s AI Grid is an open-source, agentic weather platform built for the de
 
 ---
 
+## 🏴‍☠️ The Maverick Ethos: Sovereign AI at Sea
+We reject the "Cloud-First" orthodoxy of 2026. At sea, the cloud is a myth.
+**Mariner's AI is built to survive offline.**
+
+*   **Embeddings:** Generated *on the boat* via the Slicer/Bridge.
+*   **Storage:** `sqlite-vec` stores vectors *on the iPhone's flash*.
+*   **Search:** Hybrid Queries run *on the Apple A19 chip*.
+
+This system is **Sovereign** (works if satellites fail), **Private** (data stays on board), and **Fast** (zero latency).
+
+---
+
 ## ⚓ The Problem: The Offshore Bandwidth Gap
 Offshore sailors face a dangerous reality:
 - **Global weather models** are 10-50GB (impossible to download via satellite).
@@ -38,6 +50,7 @@ Offshore sailors face a dangerous reality:
 - **Identity:** "Shadow Auth" - Anonymous device-level identity via `expo-secure-store`.
 - **Maps:** Mapbox GL Native for high-performance offline rendering.
 - **Sensors:** Signal K WebSocket bridge for real-time telemetry.
+- **Vector DB:** Native `sqlite-vec` extension for offline similarity search.
 
 ---
 
