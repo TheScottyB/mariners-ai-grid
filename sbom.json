@@ -1,0 +1,302 @@
+{
+  "projectName": "Mariner's AI Grid",
+  "version": "1.0.0",
+  "generatedAt": "2026-01-19T05:27:27.080Z",
+  "components": [
+    {
+      "name": "@bufbuild/protobuf",
+      "version": "2.10.2",
+      "type": "npm"
+    },
+    {
+      "name": "@expo/metro-config",
+      "version": "54.0.12",
+      "type": "npm"
+    },
+    {
+      "name": "@gorhom/bottom-sheet",
+      "version": "5.2.8",
+      "type": "npm"
+    },
+    {
+      "name": "@rnmapbox/maps",
+      "version": "10.2.10",
+      "type": "npm"
+    },
+    {
+      "name": "@types/ws",
+      "version": "8.18.1",
+      "type": "npm"
+    },
+    {
+      "name": "apache-arrow",
+      "version": "21.1.0",
+      "type": "npm"
+    },
+    {
+      "name": "buffer",
+      "version": "6.0.3",
+      "type": "npm"
+    },
+    {
+      "name": "expo",
+      "version": "54.0.31",
+      "type": "npm"
+    },
+    {
+      "name": "expo-background-fetch",
+      "version": "14.0.9",
+      "type": "npm"
+    },
+    {
+      "name": "expo-battery",
+      "version": "10.0.8",
+      "type": "npm"
+    },
+    {
+      "name": "expo-blur",
+      "version": "15.0.8",
+      "type": "npm"
+    },
+    {
+      "name": "expo-build-properties",
+      "version": "1.0.10",
+      "type": "npm"
+    },
+    {
+      "name": "expo-crypto",
+      "version": "15.0.8",
+      "type": "npm"
+    },
+    {
+      "name": "expo-dev-client",
+      "version": "6.0.20",
+      "type": "npm"
+    },
+    {
+      "name": "expo-file-system",
+      "version": "19.0.21",
+      "type": "npm"
+    },
+    {
+      "name": "expo-haptics",
+      "version": "15.0.8",
+      "type": "npm"
+    },
+    {
+      "name": "expo-location",
+      "version": "19.0.8",
+      "type": "npm"
+    },
+    {
+      "name": "expo-network",
+      "version": "8.0.8",
+      "type": "npm"
+    },
+    {
+      "name": "expo-secure-store",
+      "version": "15.0.8",
+      "type": "npm"
+    },
+    {
+      "name": "expo-sensors",
+      "version": "15.0.8",
+      "type": "npm"
+    },
+    {
+      "name": "expo-sqlite",
+      "version": "16.0.10",
+      "type": "npm"
+    },
+    {
+      "name": "expo-status-bar",
+      "version": "3.0.9",
+      "type": "npm"
+    },
+    {
+      "name": "expo-task-manager",
+      "version": "14.0.9",
+      "type": "npm"
+    },
+    {
+      "name": "fzstd",
+      "version": "0.1.1",
+      "type": "npm"
+    },
+    {
+      "name": "nativewind",
+      "version": "4.2.1",
+      "type": "npm"
+    },
+    {
+      "name": "onnxruntime-react-native",
+      "version": "1.23.2",
+      "type": "npm"
+    },
+    {
+      "name": "react",
+      "version": "19.1.0",
+      "type": "npm"
+    },
+    {
+      "name": "react-native",
+      "version": "0.81.5",
+      "type": "npm"
+    },
+    {
+      "name": "react-native-gesture-handler",
+      "version": "2.28.0",
+      "type": "npm"
+    },
+    {
+      "name": "react-native-reanimated",
+      "version": "4.1.1",
+      "type": "npm"
+    },
+    {
+      "name": "reconnecting-websocket",
+      "version": "4.4.0",
+      "type": "npm"
+    },
+    {
+      "name": "tailwindcss",
+      "version": "3.4.19",
+      "type": "npm"
+    },
+    {
+      "name": "ws",
+      "version": "8.19.0",
+      "type": "npm"
+    },
+    {
+      "name": "@types/react",
+      "version": "19.1.0",
+      "type": "npm"
+    },
+    {
+      "name": "protobufjs",
+      "version": "8.0.0",
+      "type": "npm"
+    },
+    {
+      "name": "ts-proto",
+      "version": "2.11.0",
+      "type": "npm"
+    },
+    {
+      "name": "typescript",
+      "version": "5.9.2",
+      "type": "npm"
+    },
+    {
+      "name": "@expo/metro-config",
+      "version": "54.0.12",
+      "type": "native"
+    },
+    {
+      "name": "@rnmapbox/maps",
+      "version": "10.2.10",
+      "type": "native"
+    },
+    {
+      "name": "expo",
+      "version": "54.0.31",
+      "type": "native"
+    },
+    {
+      "name": "expo-background-fetch",
+      "version": "14.0.9",
+      "type": "native"
+    },
+    {
+      "name": "expo-battery",
+      "version": "10.0.8",
+      "type": "native"
+    },
+    {
+      "name": "expo-blur",
+      "version": "15.0.8",
+      "type": "native"
+    },
+    {
+      "name": "expo-build-properties",
+      "version": "1.0.10",
+      "type": "native"
+    },
+    {
+      "name": "expo-crypto",
+      "version": "15.0.8",
+      "type": "native"
+    },
+    {
+      "name": "expo-dev-client",
+      "version": "6.0.20",
+      "type": "native"
+    },
+    {
+      "name": "expo-file-system",
+      "version": "19.0.21",
+      "type": "native"
+    },
+    {
+      "name": "expo-haptics",
+      "version": "15.0.8",
+      "type": "native"
+    },
+    {
+      "name": "expo-location",
+      "version": "19.0.8",
+      "type": "native"
+    },
+    {
+      "name": "expo-network",
+      "version": "8.0.8",
+      "type": "native"
+    },
+    {
+      "name": "expo-secure-store",
+      "version": "15.0.8",
+      "type": "native"
+    },
+    {
+      "name": "expo-sensors",
+      "version": "15.0.8",
+      "type": "native"
+    },
+    {
+      "name": "expo-sqlite",
+      "version": "16.0.10",
+      "type": "native"
+    },
+    {
+      "name": "expo-status-bar",
+      "version": "3.0.9",
+      "type": "native"
+    },
+    {
+      "name": "expo-task-manager",
+      "version": "14.0.9",
+      "type": "native"
+    },
+    {
+      "name": "onnxruntime-react-native",
+      "version": "1.23.2",
+      "type": "native"
+    },
+    {
+      "name": "react-native",
+      "version": "0.81.5",
+      "type": "native"
+    },
+    {
+      "name": "react-native-gesture-handler",
+      "version": "2.28.0",
+      "type": "native"
+    },
+    {
+      "name": "react-native-reanimated",
+      "version": "4.1.1",
+      "type": "native"
+    }
+  ]
+}

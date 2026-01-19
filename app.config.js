@@ -1,0 +1,107 @@
+import 'dotenv/config';
+
+export default ({ config }) => {
+  const IS_DEV = process.env.APP_VARIANT === 'development';
+  const IS_PREVIEW = process.env.APP_VARIANT === 'preview';
+
+  const getAppName = () => {
+    if (IS_DEV) return "Mariner's AI (Dev)";
+    if (IS_PREVIEW) return "Mariner's AI (Preview)";
+    return "Mariner's AI Grid";
+  };
+
+  const getBundleId = () => {
+    if (IS_DEV) return "com.thescottybe.marinersaigrid.dev";
+    if (IS_PREVIEW) return "com.thescottybe.marinersaigrid.preview";
+    return "com.thescottybe.marinersaigrid";
+  };
+
+  return {
+    ...config,
+    name: getAppName(),
+    slug: "mariners-ai-grid",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/app-icon.png",
+    userInterfaceStyle: "automatic",
+    newArchEnabled: true,
+    splash: {
+      image: "./assets/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff"
+    },
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: getBundleId(),
+      icon: "./assets/app-icon.png",
+      infoPlist: {
+        NSLocalNetworkUsageDescription: "Required to connect to your boat's Signal K server.",
+        NSLocationWhenInUseUsageDescription: "Required to show your current position on the weather grid.",
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Required for background weather alerts and route optimization."
+      }
+    },
+    android: {
+      package: getBundleId(),
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      },
+      permissions: [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "BODY_SENSORS"
+      ],
+      edgeToEdgeEnabled: true,
+      predictiveBackGestureEnabled: false
+    },
+    web: {
+      favicon: "./assets/favicon.png"
+    },
+    plugins: [
+      "expo-dev-client",
+      "expo-location",
+      "expo-sqlite",
+      [
+        "expo-build-properties",
+        {
+          ios: {
+            deploymentTarget: "15.1",
+            extraPods: [
+              {
+                name: "sqlite-vec",
+                podspec: "./plugins/with-sqlite-vec/sqlite-vec.podspec"
+              }
+            ]
+          },
+          android: {
+            compileSdkVersion: 36,
+            extraMavenRepos: [],
+            enableShrinkResources: false
+          }
+        }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          RNMapboxMapsDownloadToken: process.env.MAPBOX_SECRET_TOKEN || "sk.placeholder_secret_token",
+          RNMapboxMapsVersion: "11.0.0"
+        }
+      ],
+      [
+        "./plugins/with-sqlite-vec/withSqliteVec.js",
+        {
+          version: "0.1.6",
+          debug: IS_DEV
+        }
+      ]
+    ],
+    extra: {
+      eas: {
+        projectId: "dd3b8b54-8d49-43b1-bea7-669fd80e10c9"
+      },
+      signalKUrl: process.env.EXPO_PUBLIC_SIGNALK_URL || (IS_DEV ? "ws://localhost:3000/signalk/v1/stream" : "ws://signalk.local:3000/signalk/v1/stream")
+    }
+  };
+};

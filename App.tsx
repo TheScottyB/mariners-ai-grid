@@ -9,13 +9,13 @@ import { windDataToGeoJSON } from './src/utils/geoUtils';
 import MarinerMap, { VesselLocation } from './src/components/MarinerMap';
 import { HazardReportingModal } from './src/components/HazardReportingModal';
 import { PatternAlertStack, ConsensusData } from './src/components/PatternAlert';
-import { FirstWatchOnboarding, isOnboardingComplete } from './src/components/FirstWatchOnboarding';
 import { useSeedManager } from './src/hooks/useSeedManager';
 import { PatternMatcher, PatternAlert as PatternAlertType, TelemetrySnapshot } from './src/services/PatternMatcher';
-import { VecDB, AtmosphericVector } from './src/services/VecDB';
+import { VecDB } from './src/services/VecDB';
 import { VesselSnapshot } from './src/services/VesselSnapshot';
-import { GridSync, GridHazard } from './src/services/GridSync';
+import { GridSync } from './src/services/GridSync';
 import { MarineHazard } from './src/utils/geoUtils';
+import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
 import type { FeatureCollection, Point } from 'geojson';
 
 export default function App() {
@@ -23,7 +23,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [forecastData, setForecastData] = useState<FeatureCollection<Point> | undefined>(undefined);
-
+  
   // Hazard Reporting State
   const [reportingVisible, setReportingVisible] = useState(false);
   const [reportLocation, setReportLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -55,303 +55,31 @@ export default function App() {
     autoSelectForPosition: { lat: vesselLocation.lat, lon: vesselLocation.lng },
   });
 
-  // Handle alert acknowledgment
-  const handleAcknowledgeAlert = useCallback((alertId: string) => {
-    setAcknowledgedAlerts(prev => {
-      const next = new Set(prev);
-      next.add(alertId);
-      return next;
-    });
-    // Remove from active after brief delay (allows animation)
-    setTimeout(() => {
-      setActiveAlerts(prev => prev.filter(a => a.id !== alertId));
-    }, 300);
-  }, []);
-
-  // Build consensus data when alerts change
-  const buildConsensus = useCallback(async (alert: PatternAlertType) => {
-    const vecDb = vecDbRef.current;
-    if (!vecDb) return;
-
-    // Build consensus from the alert's matched pattern
-    const consensus: ConsensusData = {
-      localMatch: {
-        patternId: alert.matchedPattern.id,
-        label: alert.matchedPattern.label || alert.matchedPattern.id,
-        similarity: alert.matchedPattern.similarity,
-        outcome: alert.matchedPattern.outcome || alert.description,
-      },
-    };
-
-    // Try to get GraphCast prediction from seed
-    if (seedManager.activeSeed && seedManager.windGeoJSON?.features.length) {
-      // Find nearest grid point to vessel
-      let nearestFeature = seedManager.windGeoJSON.features[0];
-      let nearestDist = Infinity;
-      for (const feature of seedManager.windGeoJSON.features) {
-        const [fLon, fLat] = feature.geometry.coordinates;
-        const dist = Math.sqrt((fLat - vesselLocation.lat) ** 2 + (fLon - vesselLocation.lng) ** 2);
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearestFeature = feature;
-        }
-      }
-
-      const props = nearestFeature.properties;
-      if (props?.windSpeed) {
-        const windKts = props.windSpeed * 1.94384;
-        let outcome = windKts >= 34 ? 'Gale force winds' : windKts >= 22 ? 'Strong breeze' : 'Moderate conditions';
-        consensus.graphCastPrediction = {
-          outcome,
-          confidence: 0.82,
-          validTime: seedManager.forecastValidTime || new Date(),
-        };
-      }
-    }
-
-    setConsensusMap(prev => {
-      const next = new Map(prev);
-      next.set(alert.id, consensus);
-      return next;
-    });
-
-    // Capture divergence snapshot for grid learning
-    const consensusLevel = consensus.graphCastPrediction
-      ? (consensus.localMatch.outcome.toLowerCase().includes('gale') !==
-         consensus.graphCastPrediction.outcome.toLowerCase().includes('gale')
-          ? 'divergent'
-          : 'agree')
-      : 'unknown';
-
-    if (consensusLevel === 'divergent' && vesselSnapshotRef.current && lastTelemetryRef.current) {
-      const currentVector = patternMatcherRef.current?.getCurrentConditions();
-      if (currentVector) {
-        vesselSnapshotRef.current.captureDivergence(
-          lastTelemetryRef.current,
-          currentVector,
-          consensus,
-          consensus.graphCastPrediction ? {
-            windSpeed: 10, // Would come from seed
-            pressure: 1013,
-            validTime: consensus.graphCastPrediction.validTime,
-            model: 'ECMWF-AIFS-9km',
-          } : undefined
-        ).then(snapshot => {
-          console.log(`[App] Captured divergence snapshot: ${snapshot.snapshot_id}`);
-        }).catch(e => console.warn('[App] Failed to capture snapshot:', e));
-      }
-    }
-  }, [seedManager.activeSeed, seedManager.windGeoJSON, seedManager.forecastValidTime, vesselLocation]);
-
-  // Build consensus when alerts change
-  useEffect(() => {
-    activeAlerts.forEach(alert => {
-      if (!consensusMap.has(alert.id)) {
-        buildConsensus(alert);
-      }
-    });
-  }, [activeAlerts, buildConsensus, consensusMap]);
-
-  useEffect(() => {
-    async function init() {
-      // 0. Check if First Watch onboarding is complete
-      const onboardingDone = await isOnboardingComplete();
-      if (!onboardingDone) {
-        setShowOnboarding(true);
-        setLoading(false);
-        return; // Don't initialize services until onboarding complete
-      }
-
-      // 1. Initialize SQLite Database
-      const db = await SQLite.openDatabaseAsync('mariners_grid.db');
-      dbRef.current = db;
-
-      // Initialize VecDB for pattern matching
-      const vecDb = new VecDB(db);
-      await vecDb.initialize().catch(e => console.warn('[App] VecDB init (extension may not be available):', e));
-      vecDbRef.current = vecDb;
-
-      // Initialize VesselSnapshot for divergence capture
-      const vesselSnapshot = new VesselSnapshot(db);
-      await vesselSnapshot.initialize().catch(e => console.warn('[App] VesselSnapshot init failed:', e));
-      vesselSnapshotRef.current = vesselSnapshot;
-
-      // Initialize GridSync for fleet coordination
-      const gridSync = new GridSync(db, vesselSnapshot, vecDb);
-      await gridSync.initialize().catch(e => console.warn('[App] GridSync init failed:', e));
-      await gridSync.registerBackgroundSync().catch(e => console.warn('[App] Background sync registration failed:', e));
-      gridSyncRef.current = gridSync;
-
-      // Set up GridSync callbacks
-      gridSync.onEvents({
-        onHazardReceived: (hazard) => {
-          console.log(`[App] Received grid hazard: ${hazard.type} at ${hazard.lat}, ${hazard.lon}`);
-          // Could update map with grid hazards here
-        },
-        onPatternLearned: (pattern) => {
-          console.log(`[App] Learned new pattern: ${pattern.label}`);
-        },
-        onSyncComplete: (result) => {
-          console.log(`[App] Grid sync: ${result.uploaded} up, ${result.downloaded} down, ${result.hazardsReceived} hazards`);
-        },
-      });
-
-      // 2. Initialize Identity
-      const idService = IdentityService.getInstance();
-      const user = await idService.getOrInitializeIdentity();
-      setIdentity(user);
-
-      // 3. Connect to Signal K (NMEA 2000)
-      skBridge.current.connect((delta) => {
-        // Handle Signal K updates
-        if (delta.updates) {
-          delta.updates.forEach((update: any) => {
-            update.values.forEach((val: any) => {
-              if (val.path === 'navigation.position') {
-                setVesselLocation(prev => ({
-                  ...prev,
-                  lat: val.value.latitude,
-                  lng: val.value.longitude,
-                  timestamp: Date.now(),
-                }));
-              } else if (val.path === 'navigation.headingTrue') {
-                setVesselLocation(prev => ({
-                  ...prev,
-                  heading: (val.value * 180) / Math.PI, // rad to deg
-                }));
-              } else if (val.path === 'navigation.speedOverGround') {
-                setVesselLocation(prev => ({
-                  ...prev,
-                  sog: val.value * 1.94384, // m/s to knots
-                }));
-              }
-            });
-          });
-        }
-      });
-
-      // 4. Initialize Pattern Matcher
-      try {
-        const matcher = new PatternMatcher(db);
-        await matcher.initialize();
-
-        // Start monitoring with alert callback
-        matcher.start((alert) => {
-          console.log('[App] Pattern Alert:', alert.title);
-          setActiveAlerts(prev => {
-            // Don't add if already acknowledged
-            if (acknowledgedAlerts.has(alert.id)) return prev;
-            // Don't add duplicates
-            if (prev.some(a => a.id === alert.id)) return prev;
-            return [alert, ...prev];
-          });
-        });
-
-        // Connect Signal K telemetry to Pattern Matcher
-        skBridge.current.onTelemetry((snapshot) => {
-          matcher.processTelemetry(snapshot);
-          lastTelemetryRef.current = snapshot;
-
-          // Update GridSync position for regional sync
-          if (gridSyncRef.current) {
-            gridSyncRef.current.setPosition(snapshot.position.lat, snapshot.position.lon);
-          }
-        });
-
-        patternMatcherRef.current = matcher;
-        console.log('[App] Pattern Matcher initialized');
-      } catch (e) {
-        console.warn('[App] Pattern Matcher init failed:', e);
-      }
-
-      // 4. Try to load local weather seed (Mock for now)
-      try {
-        console.log('[App] Ready to load weather seeds');
-      } catch (e) {
-        console.warn('[App] No weather seed found');
-      }
-
-      setLoading(false);
-    }
-    init();
-
-    return () => {
-      skBridge.current.disconnect();
-      patternMatcherRef.current?.stop();
-    };
-  }, []);
-
-  const handleReportHazard = (location: { lat: number; lng: number }) => {
-    setReportLocation(location);
-    setReportingVisible(true);
-  };
-
-  const handleSubmitHazard = async (partialHazard: Partial<MarineHazard>) => {
-    const idService = IdentityService.getInstance();
-
-    const fullHazard = {
-      ...partialHazard,
-      id: Math.random().toString(36).substr(2, 9), // Temporary local ID
-      reporterId: idService.getDeviceId(),
-    };
-
-    console.log('[Waze] Submitting Hazard Report:', fullHazard);
-
-    // In production, this would save to SQLite/vec and sync to cloud
-    Alert.alert(
-      "Report Transmitted",
-      "Your report has been broadcast to the AI Grid. Thank you for protecting the fleet.",
-      [{ text: "Steady as she goes", onPress: () => setReportingVisible(false) }]
-    );
-  };
-
-  // Handle onboarding completion - re-run init to set up services
-  const handleOnboardingComplete = useCallback(async () => {
-    setShowOnboarding(false);
-    setLoading(true);
-
-    // Now initialize all services (same as the main init flow)
+  const initializeServices = useCallback(async () => {
     try {
       // 1. Initialize SQLite Database
       const db = await SQLite.openDatabaseAsync('mariners_grid.db');
       dbRef.current = db;
 
-      // Initialize VecDB for pattern matching
+      // Initialize VecDB
       const vecDb = new VecDB(db);
-      await vecDb.initialize().catch(e => console.warn('[App] VecDB init (extension may not be available):', e));
+      await vecDb.initialize().catch(e => console.warn('[App] VecDB init failed:', e));
       vecDbRef.current = vecDb;
 
-      // Initialize VesselSnapshot for divergence capture
+      // Initialize VesselSnapshot
       const vesselSnapshot = new VesselSnapshot(db);
       await vesselSnapshot.initialize().catch(e => console.warn('[App] VesselSnapshot init failed:', e));
       vesselSnapshotRef.current = vesselSnapshot;
 
-      // Initialize GridSync for fleet coordination
+      // Initialize GridSync
       const gridSync = new GridSync(db, vesselSnapshot, vecDb);
       await gridSync.initialize().catch(e => console.warn('[App] GridSync init failed:', e));
       await gridSync.registerBackgroundSync().catch(e => console.warn('[App] Background sync registration failed:', e));
       gridSyncRef.current = gridSync;
 
-      // Set up GridSync callbacks
-      gridSync.onEvents({
-        onHazardReceived: (hazard) => {
-          console.log(`[App] Received grid hazard: ${hazard.type} at ${hazard.lat}, ${hazard.lon}`);
-        },
-        onPatternLearned: (pattern) => {
-          console.log(`[App] Learned new pattern: ${pattern.label}`);
-        },
-        onSyncComplete: (result) => {
-          console.log(`[App] Grid sync: ${result.uploaded} up, ${result.downloaded} down, ${result.hazardsReceived} hazards`);
-        },
-      });
-
-      // 2. Initialize Identity
-      const idService = IdentityService.getInstance();
-      const user = await idService.getOrInitializeIdentity();
-      setIdentity(user);
-
-      // 3. Connect to Signal K (already configured during onboarding)
+      // Connect Signal K (Mock simulation by default in bridge)
       skBridge.current.connect((delta) => {
+        // Handle basic vessel tracking from Signal K updates
         if (delta.updates) {
           delta.updates.forEach((update: any) => {
             update.values.forEach((val: any) => {
@@ -362,75 +90,84 @@ export default function App() {
                   lng: val.value.longitude,
                   timestamp: Date.now(),
                 }));
-              } else if (val.path === 'navigation.headingTrue') {
-                setVesselLocation(prev => ({
-                  ...prev,
-                  heading: (val.value * 180) / Math.PI,
-                }));
-              } else if (val.path === 'navigation.speedOverGround') {
-                setVesselLocation(prev => ({
-                  ...prev,
-                  sog: val.value * 1.94384,
-                }));
               }
             });
           });
         }
       });
 
-      // 4. Initialize Pattern Matcher
-      try {
-        const matcher = new PatternMatcher(db);
-        await matcher.initialize();
+      // Initialize Pattern Matcher
+      const matcher = new PatternMatcher(db);
+      await matcher.initialize();
+      matcher.start((alert) => {
+        if (acknowledgedAlerts.has(alert.id)) return;
+        setActiveAlerts(prev => [alert, ...prev.filter(a => a.id !== alert.id)]);
+      });
+      patternMatcherRef.current = matcher;
 
-        matcher.start((alert) => {
-          console.log('[App] Pattern Alert:', alert.title);
-          setActiveAlerts(prev => {
-            if (acknowledgedAlerts.has(alert.id)) return prev;
-            if (prev.some(a => a.id === alert.id)) return prev;
-            return [alert, ...prev];
-          });
-        });
+      // Connect bridge telemetry to matcher
+      skBridge.current.onTelemetry((snapshot) => {
+        matcher.processTelemetry(snapshot);
+        lastTelemetryRef.current = snapshot;
+      });
 
-        skBridge.current.onTelemetry((snapshot) => {
-          matcher.processTelemetry(snapshot);
-          lastTelemetryRef.current = snapshot;
-
-          if (gridSyncRef.current) {
-            gridSyncRef.current.setPosition(snapshot.position.lat, snapshot.position.lon);
-          }
-        });
-
-        patternMatcherRef.current = matcher;
-        console.log('[App] Pattern Matcher initialized');
-      } catch (e) {
-        console.warn('[App] Pattern Matcher init failed:', e);
-      }
-
-      console.log('[App] Post-onboarding initialization complete');
-    } catch (e) {
-      console.error('[App] Post-onboarding init failed:', e);
+    } catch (error) {
+      console.error('[App] Failed to initialize services:', error);
     }
-
-    setLoading(false);
   }, [acknowledgedAlerts]);
 
-  // Show First Watch onboarding for new users
-  if (showOnboarding) {
-    return (
-      <FirstWatchOnboarding
-        onComplete={handleOnboardingComplete}
-        signalKBridge={skBridge.current}
-      />
-    );
-  }
+  useEffect(() => {
+    async function checkFirstWatch() {
+      // 1. Initialize Identity
+      const idService = IdentityService.getInstance();
+      const user = await idService.getOrInitializeIdentity();
+      setIdentity(user);
+
+      // 2. Check Onboarding Status
+      const complete = await isOnboardingComplete();
+      if (!complete) {
+        setShowOnboarding(true);
+        setLoading(false);
+      } else {
+        await initializeServices();
+        setLoading(false);
+      }
+    }
+    checkFirstWatch();
+
+    return () => {
+      skBridge.current.disconnect();
+      patternMatcherRef.current?.stop();
+    };
+  }, [initializeServices]);
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    setLoading(true);
+    await initializeServices();
+    setLoading(false);
+  };
+
+  const handleAcknowledgeAlert = useCallback((alertId: string) => {
+    setAcknowledgedAlerts(prev => new Set(prev).add(alertId));
+    setActiveAlerts(prev => prev.filter(a => a.id !== alertId));
+  }, []);
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#00BFFF" />
-        <Text style={styles.loadingText}>Initializing Mariner's AI Grid...</Text>
+        <Text style={styles.loadingText}>Initializing AI Grid...</Text>
       </View>
+    );
+  }
+
+  if (showOnboarding) {
+    return (
+      <FirstWatchOnboarding 
+        onComplete={handleOnboardingComplete}
+        signalKBridge={skBridge.current}
+      />
     );
   }
 
@@ -447,15 +184,16 @@ export default function App() {
         <MarinerMap
           vesselLocation={vesselLocation}
           forecastData={seedManager.windGeoJSON || forecastData}
-          onReportHazard={handleReportHazard}
+          onReportHazard={(loc) => {
+            setReportLocation(loc);
+            setReportingVisible(true);
+          }}
         />
 
-        {/* Pattern Alerts with Consensus View */}
         <PatternAlertStack
           alerts={activeAlerts}
           consensusMap={consensusMap}
           onAcknowledge={handleAcknowledgeAlert}
-          maxVisible={3}
         />
       </View>
 
@@ -463,7 +201,10 @@ export default function App() {
         visible={reportingVisible}
         location={reportLocation}
         onClose={() => setReportingVisible(false)}
-        onSubmit={handleSubmitHazard}
+        onSubmit={async (partial) => {
+          Alert.alert("Report Sent", "Observation shared with AI Grid.");
+          setReportingVisible(false);
+        }}
       />
 
       <StatusBar style="light" />
@@ -472,52 +213,12 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#001B3A',
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#001B3A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: '#E0F7FA',
-    marginTop: 20,
-    fontSize: 16,
-    letterSpacing: 1,
-  },
-  header: {
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    backgroundColor: '#001B3A',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#E0F7FA',
-    letterSpacing: 2,
-  },
-  identityBadge: {
-    backgroundColor: 'rgba(0, 191, 255, 0.2)',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#00BFFF',
-  },
-  badgeText: {
-    color: '#00BFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  mapWrapper: {
-    flex: 1,
-  }
+  container: { flex: 1, backgroundColor: '#001B3A' },
+  loadingContainer: { flex: 1, backgroundColor: '#001B3A', alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: '#E0F7FA', marginTop: 20 },
+  header: { height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, backgroundColor: '#001B3A', borderBottomWidth: 1, borderBottomColor: 'rgba(255, 255, 255, 0.1)' },
+  title: { fontSize: 20, fontWeight: '900', color: '#E0F7FA', letterSpacing: 2 },
+  identityBadge: { backgroundColor: 'rgba(0, 191, 255, 0.2)', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1, borderColor: '#00BFFF' },
+  badgeText: { color: '#00BFFF', fontSize: 10, fontWeight: 'bold' },
+  mapWrapper: { flex: 1 }
 });
