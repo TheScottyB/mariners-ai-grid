@@ -1,6 +1,7 @@
 const { withDangerousMod, withAppBuildGradle } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const { downloadFile } = require('./downloadUtils');
 
 const SQLITE_VEC_VERSION = '0.1.6';
@@ -94,20 +95,72 @@ const withSqliteVec = (config, props = {}) => {
         fs.mkdirSync(vendorDir, { recursive: true });
       }
 
-      // Check for the static library, download if missing
-      const libPath = path.join(vendorDir, 'libsqlite_vec.a');
-      if (!fs.existsSync(libPath)) {
-        // sqlite-vec releases the iOS library as a .zip containing libsqlite_vec.a
-        // For now, we'll try to download a pre-built universal binary
-        const iosUrl = `https://github.com/asg017/sqlite-vec/releases/download/v${version}/sqlite-vec-v${version}-ios-universal.a`;
-        console.log(`[withSqliteVec] Downloading iOS library from ${iosUrl}`);
+      // Check for the source files, download if missing
+      const sourceCPath = path.join(vendorDir, 'sqlite-vec.c');
+      const sourceHPath = path.join(vendorDir, 'sqlite-vec.h');
+      
+      if (!fs.existsSync(sourceCPath) || !fs.existsSync(sourceHPath)) {
+        // sqlite-vec releases an amalgamation tarball containing the source
+        const iosUrl = `https://github.com/asg017/sqlite-vec/releases/download/v${version}/sqlite-vec-${version}-amalgamation.tar.gz`;
+        const tarballPath = path.join(vendorDir, 'sqlite-vec-amalgamation.tar.gz');
+
+        console.log(`[withSqliteVec] Downloading source amalgamation from ${iosUrl}`);
         try {
-          await downloadFile(iosUrl, libPath);
-          console.log(`[withSqliteVec] Downloaded libsqlite_vec.a to ${libPath}`);
+          await downloadFile(iosUrl, tarballPath);
+          console.log(`[withSqliteVec] Downloaded tarball to ${tarballPath}`);
+          
+          // Extract the tarball
+          console.log(`[withSqliteVec] Extracting tarball...`);
+          try {
+            // The amalgamation tarball usually extracts to a folder like sqlite-vec-vX.X.X-amalgamation/
+            // or sometimes directly, depending on how it was packed.
+            execSync(`tar -xzf "${tarballPath}" -C "${vendorDir}"`);
+            
+            // Check if files were extracted directly to vendorDir
+            const directC = path.join(vendorDir, 'sqlite-vec.c');
+            const directH = path.join(vendorDir, 'sqlite-vec.h');
+            
+            if (fs.existsSync(directC) && fs.existsSync(directH)) {
+                console.log(`[withSqliteVec] Extracted source files directly to ${vendorDir}`);
+            } else {
+                // Find the extracted folder
+                const files = fs.readdirSync(vendorDir);
+                let extractedDir = null;
+                for (const file of files) {
+                    const fullPath = path.join(vendorDir, file);
+                    if (fs.statSync(fullPath).isDirectory() && (file.includes('amalgamation') || file.includes('sqlite-vec'))) {
+                        // Check if this directory contains the source files
+                        if (fs.existsSync(path.join(fullPath, 'sqlite-vec.c'))) {
+                            extractedDir = fullPath;
+                            break;
+                        }
+                    }
+                }
+                
+                if (extractedDir) {
+                    // Move .c and .h files to vendorDir
+                    fs.copyFileSync(path.join(extractedDir, 'sqlite-vec.c'), sourceCPath);
+                    fs.copyFileSync(path.join(extractedDir, 'sqlite-vec.h'), sourceHPath);
+                    
+                    // Cleanup extracted dir
+                    fs.rmSync(extractedDir, { recursive: true, force: true });
+                    console.log(`[withSqliteVec] Extracted source files to ${vendorDir}`);
+                } else {
+                     throw new Error("Could not find extracted source files");
+                }
+            }
+            
+            // Clean up tarball
+            fs.unlinkSync(tarballPath);
+            
+          } catch (tarError) {
+             console.error(`[withSqliteVec] Error extracting tarball: ${tarError.message}`);
+             throw tarError;
+          }
+
         } catch (e) {
-          console.warn(`[withSqliteVec] WARNING: Could not download iOS library: ${e.message}`);
-          console.log('[withSqliteVec] Download manually from: https://github.com/asg017/sqlite-vec/releases');
-          console.log('[withSqliteVec] Skipping iOS sqlite-vec integration (library not found)');
+          console.warn(`[withSqliteVec] WARNING: Could not download/extract source: ${e.message}`);
+          console.log('[withSqliteVec] Skipping iOS sqlite-vec integration (source not found)');
           return config;
         }
       }
@@ -122,11 +175,17 @@ const withSqliteVec = (config, props = {}) => {
         fs.mkdirSync(targetVendorDir, { recursive: true });
       }
 
-      // Copy the static library
-      const targetLibPath = path.join(targetVendorDir, 'libsqlite_vec.a');
-      if (!fs.existsSync(targetLibPath)) {
-        fs.copyFileSync(libPath, targetLibPath);
-        console.log(`[withSqliteVec] Copied libsqlite_vec.a to ${targetLibPath}`);
+      // Copy the source files
+      const targetCPath = path.join(targetVendorDir, 'sqlite-vec.c');
+      const targetHPath = path.join(targetVendorDir, 'sqlite-vec.h');
+      
+      if (!fs.existsSync(targetCPath)) {
+        fs.copyFileSync(sourceCPath, targetCPath);
+        console.log(`[withSqliteVec] Copied sqlite-vec.c to ${targetCPath}`);
+      }
+      if (!fs.existsSync(targetHPath)) {
+        fs.copyFileSync(sourceHPath, targetHPath);
+        console.log(`[withSqliteVec] Copied sqlite-vec.h to ${targetHPath}`);
       }
 
       // Copy the podspec

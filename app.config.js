@@ -79,7 +79,7 @@ export default ({ config }) => {
       [
         "@rnmapbox/maps",
         {
-          RNMapboxMapsVersion: "11.8.0"
+          RNMapboxMapsVersion: "11.16.2"
         }
       ],
       [
