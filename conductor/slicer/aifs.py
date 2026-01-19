@@ -5,6 +5,9 @@
 AIFS Slicer (AI Integrated Forecasting System).
 
 Fetches data from ECMWF Open Data (AIFS) for local AI model seeds.
+Leverages the "Open Data Advantage" (Oct 1, 2025) to pull native 9km resolution
+at zero information cost.
+
 Enforces:
 1. 2.5-degree spatial buffer (to prevent edge artifacts)
 2. Autoregressive state (t, t-6h) for GraphCast initialization
@@ -29,8 +32,8 @@ class AIFSSlicer:
     Slices ECMWF AIFS Open Data for local AI inference.
     """
     
-    # AIFS Native Resolution is 0.25 deg
-    RESOLUTION = 0.25
+    # AIFS Native Resolution is ~9km (0.1 deg) as of Oct 2025 Open Data update
+    RESOLUTION = 0.1
     
     def __init__(self, cache_dir: Optional[Path] = None):
         self.cache_dir = cache_dir or Path("/tmp/mag_cache")
