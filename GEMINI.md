@@ -15,6 +15,10 @@
 ### Mobile App (The "Watchkeeper")
 *   **Framework:** Expo SDK 54 (Managed Workflow + Continuous Native Generation).
 *   **Language:** TypeScript (Strict Mode).
+*   **Minimum Requirements:**
+    *   **iOS:** 14.0+ (iPhone 11 / A13 Bionic minimum, iPhone 12 / A14+ recommended)
+    *   **Android:** API 26+ (Android 8.0, Snapdragon 865+ / arm64-v8a only)
+    *   **Rationale:** Edge AI inference (GraphCast ONNX, CoreML 4) requires modern NPU/Neural Engine
 *   **Vector DB:** `sqlite-vec` (Native Extension via Custom Plugin).
     *   *Note:* We use a custom plugin (`plugins/with-sqlite-vec`) to bundle the static library for true offline capability, rather than relying on Expo's default dynamic loading.
 *   **Maps:** `@rnmapbox/maps` (v11+) with offline vector tiles.

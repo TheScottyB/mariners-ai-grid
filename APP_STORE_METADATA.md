@@ -37,7 +37,7 @@ Mariner’s AI is the first open-source, agentic weather platform built for the 
 *   **🌊 The "Waze" Layer:** Real-time social reporting for floating debris, harbor surge, and hidden hazards.
 *   **🛰️ Satellite Optimized:** Our proprietary "Slicer" tech turns 10GB global data into 5MB satellite-friendly "seeds."
 *   **⚓ The Mariner’s Code:** Every boat becomes a sensor. Securely share your wind and pressure data to help the fleet and improve the AI grid.
-*   **📱 Expo-Native Performance:** Optimized for the latest iOS 26 Liquid Glass and Android hardware.
+*   **📱 Optimized for Modern Hardware:** Requires iPhone 11+ (A13 Bionic) or equivalent Android (Snapdragon 865+) for edge AI inference.
 
 **Join the grid. Protect the fleet. Navigate with intelligence.**
 

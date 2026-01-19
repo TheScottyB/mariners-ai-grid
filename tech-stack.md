@@ -4,10 +4,14 @@
 - **Framework:** Expo SDK (Latest Stable)
 - **Workflow:** Managed with Continuous Native Generation (CNG)
 - **Language:** TypeScript (Strict Mode)
+- **Minimum iOS:** 14.0 (iPhone 11 / A13 Bionic+)
+- **Minimum Android:** API 26 (Android 8.0)
 - **State Management:** TanStack Query (for weather data caching) + Zustand (UI state)
 
 ## 2. AI & Data Architecture
 - **Local Inference:** ONNX Runtime / CoreML (via custom Expo Modules)
+  - **Target Hardware:** iPhone 11+ (A13 Bionic Neural Engine 8-core), M1+ Macs, Snapdragon 865+ Android
+  - **Architecture:** arm64 only (iOS/Android), no legacy 32-bit support
 - **Vector Search:** `sqlite-vec` (Native extension bundled via Config Plugin) - **Critical for Offline AI**
 - **Ingest Pipeline:** **Apache Arrow** (<50ms ingest) + **Parquet** (Columnar compression) - The "Secret Sauce" for instant map rendering.
 - **Model Storage:** Expo FileSystem (Regional .zarr / .parquet storage)

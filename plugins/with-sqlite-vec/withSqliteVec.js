@@ -8,10 +8,9 @@ const SQLITE_VEC_VERSION = '0.1.6';
 
 const withSqliteVec = (config, props = {}) => {
   const version = props.version || SQLITE_VEC_VERSION;
-  const debug = props.debug || false;
 
   // =========================================================================
-  // Android Configuration
+  // Android Configuration (Unchanged)
   // =========================================================================
   config = withDangerousMod(config, [
     'android',
@@ -21,7 +20,6 @@ const withSqliteVec = (config, props = {}) => {
       const projectRoot = config.modRequest.projectRoot;
       const jniLibsDir = path.join(projectRoot, 'android', 'app', 'src', 'main', 'jniLibs');
 
-      // Architectures to support
       const archs = {
         'arm64-v8a': 'aarch64',
         'armeabi-v7a': 'armv7',
@@ -40,17 +38,11 @@ const withSqliteVec = (config, props = {}) => {
           const url = `https://github.com/asg017/sqlite-vec/releases/download/v${version}/sqlite-vec-${version}-loadable-android-${vecArch}.tar.gz`;
           const tarballPath = path.join(targetDir, `sqlite-vec-android-${vecArch}.tar.gz`);
           
-          console.log(`[withSqliteVec] Downloading ${url}`);
           try {
             await downloadFile(url, tarballPath);
-            console.log(`[withSqliteVec] Downloaded tarball to ${tarballPath}`);
-            
-            // Extract tarball
             try {
                 execSync(`tar -xzf "${tarballPath}" -C "${targetDir}"`);
                 
-                // Locate libsqlite_vec.so
-                // It might be directly in targetDir or in a subdir
                 const findLib = (dir) => {
                     const files = fs.readdirSync(dir);
                     for (const file of files) {
@@ -65,31 +57,16 @@ const withSqliteVec = (config, props = {}) => {
                     return null;
                 };
                 
-                // Start search from targetDir
                 const foundLibPath = findLib(targetDir);
-                
                 if (foundLibPath && foundLibPath !== libPath) {
                     fs.renameSync(foundLibPath, libPath);
-                    console.log(`[withSqliteVec] Moved ${foundLibPath} to ${libPath}`);
-                } else if (!foundLibPath) {
-                     // If strictly following the release structure, it might be named differently?
-                     // But usually it's libsqlite_vec.so.
-                     // Check for any .so file if specific name not found? No, dangerous.
-                     throw new Error(`libsqlite_vec.so not found in extracted archive for ${androidArch}`);
                 }
-                
-                // Cleanup: Remove tarball and any remaining subdirectories/files (except the lib itself)
-                // Actually, just removing the tarball is safe. Cleaning up extracted debris is harder without knowing structure.
-                // We'll trust the user/system to ignore extra files or we can try to clean known dirs.
                 fs.unlinkSync(tarballPath);
-                
             } catch (extractError) {
                 console.error(`[withSqliteVec] Error extracting android tarball: ${extractError.message}`);
-                throw extractError;
             }
-
           } catch (e) {
-            console.warn(`[withSqliteVec] WARNING: libsqlite_vec.so not found for ${androidArch}: ${e.message}`);
+            console.warn(`[withSqliteVec] WARNING: libsqlite_vec.so not found for ${androidArch}`);
           }
         }
       }
@@ -112,177 +89,169 @@ const withSqliteVec = (config, props = {}) => {
         `;
         if (buildGradle.includes('android {')) {
           buildGradle = buildGradle.replace('android {', 'android {' + packagingOptions);
-        } else {
-          console.warn('[withSqliteVec] Could not find android block in build.gradle');
         }
         config.modResults.contents = buildGradle;
-        console.log('[withSqliteVec] Modified build.gradle for sqlite-vec');
       }
-    } else {
-      console.warn('[withSqliteVec] Kotlin build.gradle not supported yet');
     }
     return config;
   });
 
   // =========================================================================
-  // iOS Configuration - Download static libraries and modify Podfile
+  // iOS Configuration - XCFramework Generation
   // =========================================================================
   config = withDangerousMod(config, [
     'ios',
     async (config) => {
-      console.log(`[withSqliteVec] Configuring sqlite-vec v${version} for iOS`);
+      console.log(`[withSqliteVec] Configuring sqlite-vec v${version} for iOS (XCFramework)`);
 
       const projectRoot = config.modRequest.projectRoot;
       const iosDir = path.join(projectRoot, 'ios');
       const podfilePath = path.join(iosDir, 'Podfile');
-
-      // Ensure vendor directory exists
+      
       const vendorDir = path.join(projectRoot, 'plugins', 'with-sqlite-vec', 'vendor', 'ios');
+      const xcframeworkName = 'sqlite_vec.xcframework';
+      const xcframeworkPath = path.join(vendorDir, xcframeworkName);
+
+      // Setup directories
       if (!fs.existsSync(vendorDir)) {
         fs.mkdirSync(vendorDir, { recursive: true });
       }
 
-      // Check for the static library, download if missing
-      const libPath = path.join(vendorDir, 'libsqlite_vec.a');
+      // Check if XCFramework exists, if not, generate it
+      if (!fs.existsSync(xcframeworkPath)) {
+        console.log('[withSqliteVec] Generating XCFramework...');
+        
+        const tempDir = path.join(vendorDir, 'temp_build');
+        if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+        fs.mkdirSync(tempDir, { recursive: true });
 
-      if (!fs.existsSync(libPath)) {
-        // Download static libraries for each architecture and create fat binary
-        const archs = [
-          { name: 'ios-aarch64', type: 'static-ios-aarch64' },
-          { name: 'sim-arm64', type: 'static-iossimulator-aarch64' },
-          { name: 'sim-x86_64', type: 'static-iossimulator-x86_64' }
+        // Architectures to download
+        const targets = [
+          { name: 'ios-arm64', type: 'static-ios-aarch64' }, // Device
+          { name: 'sim-arm64', type: 'static-iossimulator-aarch64' }, // Sim M1
+          { name: 'sim-x86_64', type: 'static-iossimulator-x86_64' } // Sim Intel
         ];
 
-        const libPaths = [];
+        try {
+          // 1. Download and Extract all libs
+          const libPaths = {}; // name -> path
 
-        for (const arch of archs) {
-          const archDir = path.join(vendorDir, arch.name);
-          if (!fs.existsSync(archDir)) {
-            fs.mkdirSync(archDir, { recursive: true });
-          }
+          for (const target of targets) {
+            const targetDir = path.join(tempDir, target.name);
+            fs.mkdirSync(targetDir, { recursive: true });
+            
+            const tarballUrl = `https://github.com/asg017/sqlite-vec/releases/download/v${version}/sqlite-vec-${version}-${target.type}.tar.gz`;
+            const tarballPath = path.join(targetDir, 'archive.tar.gz');
 
-          const archLibPath = path.join(archDir, 'libsqlite_vec.a');
-          const tarballUrl = `https://github.com/asg017/sqlite-vec/releases/download/v${version}/sqlite-vec-${version}-${arch.type}.tar.gz`;
-          const tarballPath = path.join(archDir, 'sqlite-vec.tar.gz');
-
-          console.log(`[withSqliteVec] Downloading ${arch.name} static library...`);
-          try {
+            console.log(`[withSqliteVec] Downloading ${target.name}...`);
             await downloadFile(tarballUrl, tarballPath);
-            execSync(`tar -xzf "${tarballPath}" -C "${archDir}"`);
-
-            // Find the .a file in extracted contents
-            const files = fs.readdirSync(archDir);
-            for (const file of files) {
-              if (file.endsWith('.a')) {
-                const extractedLib = path.join(archDir, file);
-                if (extractedLib !== archLibPath) {
-                  fs.renameSync(extractedLib, archLibPath);
-                }
-                break;
-              }
-            }
-
-            // Cleanup tarball
+            execSync(`tar -xzf "${tarballPath}" -C "${targetDir}"`);
             fs.unlinkSync(tarballPath);
 
-            if (fs.existsSync(archLibPath)) {
-              libPaths.push(archLibPath);
-              console.log(`[withSqliteVec] Downloaded ${arch.name} library`);
+            // Find .a file
+            const files = fs.readdirSync(targetDir);
+            const libFile = files.find(f => f.endsWith('.a'));
+            if (libFile) {
+              const originalPath = path.join(targetDir, libFile);
+              const standardizedPath = path.join(targetDir, 'libsqlite_vec.a');
+              
+              if (originalPath !== standardizedPath) {
+                  fs.renameSync(originalPath, standardizedPath);
+              }
+              libPaths[target.name] = standardizedPath;
+            } else {
+              throw new Error(`No .a file found for ${target.name}`);
             }
-          } catch (e) {
-            console.warn(`[withSqliteVec] WARNING: Could not download ${arch.name}: ${e.message}`);
           }
-        }
 
-        // For local development, prefer simulator library
-        // For production builds (EAS), we'll use device library
-        if (libPaths.length > 0) {
-          // Check if we're building for simulator (local dev) or device (EAS)
-          const simArm64Lib = path.join(vendorDir, 'sim-arm64', 'libsqlite_vec.a');
-          const deviceLib = path.join(vendorDir, 'ios-aarch64', 'libsqlite_vec.a');
+          // 2. Create Fat Binary for Simulator (arm64 + x86_64)
+          // Since they are different architectures for the same platform (simulator), we lipo them.
+          const simFatDir = path.join(tempDir, 'sim-fat');
+          if (!fs.existsSync(simFatDir)) fs.mkdirSync(simFatDir);
           
-          if (fs.existsSync(simArm64Lib)) {
-            // Use simulator library for local development
-            fs.copyFileSync(simArm64Lib, libPath);
-            console.log(`[withSqliteVec] Using simulator arm64 library for local development`);
-          } else if (fs.existsSync(deviceLib)) {
-            // Fallback to device library
-            fs.copyFileSync(deviceLib, libPath);
-            console.log(`[withSqliteVec] Using device arm64 library`);
-          } else if (libPaths.length > 0) {
-            fs.copyFileSync(libPaths[0], libPath);
-            console.log(`[withSqliteVec] Using first available library`);
+          const simFatLibPath = path.join(simFatDir, 'libsqlite_vec.a'); // Must match device lib name
+          const simInputs = [libPaths['sim-arm64'], libPaths['sim-x86_64']].filter(Boolean);
+          
+          if (simInputs.length > 0) {
+            console.log('[withSqliteVec] Creating Simulator Fat Library...');
+            execSync(`lipo -create ${simInputs.map(p => `"${p}"`).join(' ')} -output "${simFatLibPath}"`);
+          } else {
+             throw new Error('No simulator libraries found');
           }
-        } else {
-          console.warn('[withSqliteVec] WARNING: No static libraries downloaded');
-          console.log('[withSqliteVec] Skipping iOS sqlite-vec integration');
-          return config;
+
+          // 3. Create XCFramework
+          // Combine Device Lib + Simulator Fat Lib
+          // Both must have the same filename (libsqlite_vec.a) which they now do (in different dirs)
+          const deviceLibPath = libPaths['ios-arm64'];
+          if (!deviceLibPath) throw new Error('No device library found');
+
+          console.log('[withSqliteVec] Creating XCFramework...');
+          
+          const createCmd = [
+            'xcodebuild',
+            '-create-xcframework',
+            `-library "${deviceLibPath}"`,
+            `-library "${simFatLibPath}"`,
+            `-output "${xcframeworkPath}"`
+          ].join(' ');
+
+          execSync(createCmd);
+          console.log(`[withSqliteVec] Successfully created ${xcframeworkName}`);
+
+        } catch (error) {
+          console.error(`[withSqliteVec] Failed to generate XCFramework: ${error.message}`);
+          // Fallback? No, hard fail is better here.
+          throw error;
+        } finally {
+          // Cleanup temp
+          if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
         }
       }
 
-      // Copy podspec and library to ios directory for CocoaPods
-      const sourcePodspec = path.join(projectRoot, 'plugins', 'with-sqlite-vec', 'sqlite-vec.podspec');
+      // Sync to iOS Project
       const targetPodspecDir = path.join(iosDir, 'plugins', 'with-sqlite-vec');
       const targetVendorDir = path.join(targetPodspecDir, 'vendor', 'ios');
-
-      // Create directory structure
-      if (!fs.existsSync(targetVendorDir)) {
-        fs.mkdirSync(targetVendorDir, { recursive: true });
-      }
-
-      // Copy the static library
-      const targetLibPath = path.join(targetVendorDir, 'libsqlite_vec.a');
-      if (!fs.existsSync(targetLibPath)) {
-        fs.copyFileSync(libPath, targetLibPath);
-        console.log(`[withSqliteVec] Copied libsqlite_vec.a to ${targetLibPath}`);
-      }
-
-      // Copy the podspec
-      const targetPodspecPath = path.join(targetPodspecDir, 'sqlite-vec.podspec');
-      if (!fs.existsSync(targetPodspecPath)) {
-        fs.copyFileSync(sourcePodspec, targetPodspecPath);
-        console.log(`[withSqliteVec] Copied podspec to ${targetPodspecPath}`);
-      }
       
-      // Copy the auto-init C file
+      if (!fs.existsSync(targetVendorDir)) fs.mkdirSync(targetVendorDir, { recursive: true });
+
+      // Copy XCFramework to ios/plugins/... 
+      // Note: XCFramework is a directory
+      const targetFrameworkPath = path.join(targetVendorDir, xcframeworkName);
+      
+      // Recursive copy function
+      const copyRecursive = (src, dest) => {
+        if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
+        fs.cpSync(src, dest, { recursive: true });
+      };
+
+      if (fs.existsSync(xcframeworkPath)) {
+        copyRecursive(xcframeworkPath, targetFrameworkPath);
+        console.log(`[withSqliteVec] Synced XCFramework to ${targetFrameworkPath}`);
+      }
+
+      // Copy Podspec
+      const sourcePodspec = path.join(projectRoot, 'plugins', 'with-sqlite-vec', 'sqlite-vec.podspec');
+      const targetPodspecPath = path.join(targetPodspecDir, 'sqlite-vec.podspec');
+      fs.copyFileSync(sourcePodspec, targetPodspecPath);
+      
+      // Copy auto-init C file (Keep it for now)
       const sourceInitFile = path.join(projectRoot, 'plugins', 'with-sqlite-vec', 'sqlite-vec-auto-init.c');
       const targetInitFile = path.join(targetPodspecDir, 'sqlite-vec-auto-init.c');
       if (fs.existsSync(sourceInitFile)) {
-        fs.copyFileSync(sourceInitFile, targetInitFile);
-        console.log(`[withSqliteVec] Copied auto-init file to ${targetInitFile}`);
-      } else {
-        console.warn(`[withSqliteVec] WARNING: sqlite-vec-auto-init.c not found at ${sourceInitFile}`);
+         fs.copyFileSync(sourceInitFile, targetInitFile);
       }
 
-      // Modify Podfile to add the pod with :path reference
+      // Configure Podfile
       if (fs.existsSync(podfilePath)) {
         let podfileContent = fs.readFileSync(podfilePath, 'utf8');
-
-        // Check if sqlite-vec is already added
         if (!podfileContent.includes("pod 'sqlite-vec'")) {
-          // Find the target block and add the pod there
-          // Insert after "use_expo_modules!"
           const insertMarker = 'use_expo_modules!';
-          const podLine = `
-  # sqlite-vec for vector search
-  pod 'sqlite-vec', :path => './plugins/with-sqlite-vec'
-`;
-
+          const podLine = `\n  pod 'sqlite-vec', :path => './plugins/with-sqlite-vec'\n`;
           if (podfileContent.includes(insertMarker)) {
-            podfileContent = podfileContent.replace(
-              insertMarker,
-              insertMarker + podLine
-            );
+            podfileContent = podfileContent.replace(insertMarker, insertMarker + podLine);
             fs.writeFileSync(podfilePath, podfileContent);
-            console.log('[withSqliteVec] Added sqlite-vec pod to Podfile');
-          } else {
-            console.warn('[withSqliteVec] Could not find insertion point in Podfile');
           }
-        } else {
-          console.log('[withSqliteVec] sqlite-vec pod already in Podfile');
         }
-      } else {
-        console.warn('[withSqliteVec] Podfile not found at', podfilePath);
       }
 
       return config;

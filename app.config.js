@@ -99,7 +99,7 @@ export default ({ config }) => {
         "expo-build-properties",
         {
           ios: {
-            deploymentTarget: "15.1"
+            deploymentTarget: "14.0"
           },
           android: {
             compileSdkVersion: 36,

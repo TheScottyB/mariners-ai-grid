@@ -9,6 +9,25 @@ You are operating in a **secure local development environment** on macOS:
 
 All agents have **full local file system, bash command, and web access**. This is a trusted development machine.
 
+## Project Device Requirements
+
+This app requires **edge AI inference** with modern hardware:
+
+### iOS
+- **Minimum:** iPhone 11 (A13 Bionic), iOS 14.0+
+- **Recommended:** iPhone 12+ (A14+) for optimal AI performance
+- **Why iOS 14.0?** CoreML 4 provides better Neural Engine utilization for on-device GraphCast inference
+- **Build Target:** arm64 only (no x86_64 Intel Mac support)
+
+### Android
+- **Minimum:** Snapdragon 865 / Exynos 990 (2020+) with dedicated NPU, Android 8.0+ (API 26)
+- **Architecture:** arm64-v8a only (no 32-bit armeabi-v7a support)
+
+### Why These Requirements?
+- **Vector Search:** sqlite-vec needs modern 64-bit architecture
+- **AI Models:** GraphCast ONNX inference requires Neural Engine/NPU
+- **Offline Performance:** Older devices (A12, A11) can't handle real-time weather model execution
+
 ## Critical Rules for Environment Variables
 
 ### 🔒 DO NOT modify real API keys in `.env` files
