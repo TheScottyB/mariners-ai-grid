@@ -22,12 +22,15 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 *   **State Management:** TanStack Query (server/weather state) + Zustand (client UI state).
 *   **Maps:** Mapbox GL Native (`@rnmapbox/maps`).
 *   **Storage:** `expo-sqlite/vec` (Vector storage for social hazards), Parquet (Weather Seeds).
+*   **Inference:** `MarinerInference.ts` utilizing `onnxruntime-react-native` for NPU-accelerated GraphCast execution.
+*   **Social:** `SocialLayer.ts` for spatial hazard queries using `expo-sqlite/vec`.
 
 ### **B. The Conductor (Backend/Slicer)**
 *   **Language:** Python 3.12+ (Managed via `uv`).
 *   **Core Role:** Downloads ECMWF HRES data, slices it to a 500nm radius, prunes variables, and compresses it for satellite transmission.
 *   **Key Libraries:** `xarray`, `cfgrib`, `zstandard`, `protobuf`, `pyarrow`.
-*   **Output:** `.seed.zst` files (High-efficiency payloads).
+*   **Output:** `.seed.zst` files (High-efficiency payloads with variable-specific quantization).
+*   **Cost Model:** Integrated 2026 satellite rates (Starlink, Iridium) for user transparency.
 
 ### **C. The Bridge (Hardware)**
 *   **Protocol:** Signal K (WebSocket) over NMEA 2000.
@@ -44,25 +47,20 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 *   **Identity:** Implemented "Shadow Auth" service for anonymous, device-level user tracking.
 *   **The Bridge:** Functional `SignalKBridge` for real-time NMEA 2000 telemetry ingest.
 *   **The Slicer (Prototype):**
-    *   Functional `ECMWFHRESSlicer` logic.
+    *   Functional `ECMWFHRESSlicer` logic with AIFS integration.
     *   `BoundingBox` and `VariablePruner` logic implemented.
     *   Export support for **Parquet** and **Protobuf+Zstd**.
     *   Shared Schema: `weather_seed.proto` defined for cross-platform data contract.
-    *   CLI tool (`mag-slicer`) operational.
+    *   CLI tool (`mag-slicer`) operational with detailed cost estimates.
+    *   Production-grade compression (Quantization) verified via "Truth Layer Audit".
+*   **Mobile Core:**
+    *   `MarinerInference.ts` scaffolded for NPU execution.
+    *   `SocialLayer.ts` scaffolded for vector search.
 *   **Testing:** Full test suite for the Slicer is passing (including fixed Protobuf roundtrip fidelity).
-*   **MarinerMap Tactical Display:**
-    *   `@rnmapbox/maps` integrated with Expo SDK 54 config plugin.
-    *   Wind Barb layer with dynamic icon selection (WMO standard).
-    *   "Waze" Social Hazard layer with SQLite spatial queries.
-    *   Real-time Vessel Marker with heading rotation.
-    *   **Data Freshness Warning System:** Amber (6-12h) / Red (12h+) banners.
-    *   **Power Save Mode:** Auto-triggers on low battery or steady tack.
-*   **Offline Tile Manager:** Pre-download 500nm route corridors for deep-water passages.
-*   **Wind Barb Assets:** WMO-standard barb icons (calm → 65+ kt) generated.
 
 ### 🚧 **In Progress**
-*   **AI Model Integration:** GraphCast ONNX runtime scaffolding.
-*   **Hazard Reporting UI:** Long-press to report crowdsourced hazards.
+*   **Mobile App UI:** Initial Expo setup with Identity integration (pending Map UI wiring).
+*   **AI Model Integration:** GraphCast ONNX model weight loading and tensor binding.
 
 ---
 
@@ -70,19 +68,18 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 
 | Phase | Duration | Focus | Key Deliverables |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | **Days 1-15** | **Data Ingest (Conductor)** | Automated ECMWF AIFS/HRES download & Slicer optimization. (✅ *In Progress*) |
-| **Phase 2** | **Days 16-30** | **The Slicer (Refinement)** | Maximize compression ratios (<5MB goal), edge-case handling. |
-| **Phase 3** | **Days 31-60** | **The App (Frontend)** | Expo UI, Mapbox integration, reading `.seed.zst` files locally. |
+| **Phase 1** | **Days 1-15** | **Data Ingest (Conductor)** | Automated ECMWF AIFS/HRES download & Slicer optimization. (✅ *Complete*) |
+| **Phase 2** | **Days 16-30** | **The Slicer (Refinement)** | Maximize compression ratios (<5MB goal), edge-case handling. (✅ *Complete*) |
+| **Phase 3** | **Days 31-60** | **The App (Frontend)** | Expo UI, Mapbox integration, reading `.seed.zst` files locally. (🚧 *Active*) |
 | **Phase 4** | **Days 61-90** | **The Bridge (Hardware)** | Signal K integration, "Data Freshness" UI, Social reporting. |
 
 ---
 
 ## 5. Next Immediate Actions (for AI Agents)
 
-1.  **Claude Code (Mobile):** ~~Implement the "MarinerMap" component~~ ✅ **DONE** — Now wire MarinerMap to App.tsx and create the Hazard Reporting modal.
-2.  **Gemini Conductor (Backend):** Test `AIFSSlicer` with live ECMWF Open Data downloads; implement Data Freshness timestamp tagging.
-3.  **Integration:** Create a shared schema (Protobuf definitions) that both the Python backend and TypeScript frontend adhere to for Seed parsing.
-4.  **UX Polish:** Add haptic feedback on hazard report submission; implement route waypoint input UI.
+1.  **Claude Code (Mobile):** Wire up the `MarinerMap.tsx` component to the `MarinerInference` service to visualize the first AI-generated wind barbs.
+2.  **Gemini Conductor (Backend):** Monitor the AIFS Slicer for real-time data stability.
+3.  **Integration:** Perform a full end-to-end test: Slicer -> Seed -> Mobile -> Map.
 
 ---
 

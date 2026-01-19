@@ -1,12 +1,17 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, ActivityIndicator, SafeAreaView, Alert } from 'react-native';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import * as SQLite from 'expo-sqlite';
 import { IdentityService, MarinerIdentity } from './src/services/IdentityService';
 import { SignalKBridge } from './src/services/SignalKBridge';
 import { SeedReader } from './src/services/SeedReader';
 import { windDataToGeoJSON } from './src/utils/geoUtils';
 import MarinerMap, { VesselLocation } from './src/components/MarinerMap';
 import { HazardReportingModal } from './src/components/HazardReportingModal';
+import { PatternAlertStack, ConsensusData } from './src/components/PatternAlert';
+import { useSeedManager } from './src/hooks/useSeedManager';
+import { PatternMatcher, PatternAlert as PatternAlertType } from './src/services/PatternMatcher';
+import { VecDB, AtmosphericVector } from './src/services/VecDB';
 import { MarineHazard } from './src/utils/geoUtils';
 import type { FeatureCollection, Point } from 'geojson';
 
@@ -28,16 +33,108 @@ export default function App() {
     timestamp: Date.now(),
   });
 
+  // Pattern Alert State
+  const [activeAlerts, setActiveAlerts] = useState<PatternAlertType[]>([]);
+  const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Set<string>>(new Set());
+  const [consensusMap, setConsensusMap] = useState<Map<string, ConsensusData>>(new Map());
+
   const skBridge = useRef(new SignalKBridge());
+  const patternMatcherRef = useRef<PatternMatcher | null>(null);
+  const vecDbRef = useRef<VecDB | null>(null);
+  const dbRef = useRef<SQLite.SQLiteDatabase | null>(null);
+
+  // Weather Seed Manager
+  const seedManager = useSeedManager({
+    autoSelectForPosition: { lat: vesselLocation.lat, lon: vesselLocation.lng },
+  });
+
+  // Handle alert acknowledgment
+  const handleAcknowledgeAlert = useCallback((alertId: string) => {
+    setAcknowledgedAlerts(prev => {
+      const next = new Set(prev);
+      next.add(alertId);
+      return next;
+    });
+    // Remove from active after brief delay (allows animation)
+    setTimeout(() => {
+      setActiveAlerts(prev => prev.filter(a => a.id !== alertId));
+    }, 300);
+  }, []);
+
+  // Build consensus data when alerts change
+  const buildConsensus = useCallback(async (alert: PatternAlertType) => {
+    const vecDb = vecDbRef.current;
+    if (!vecDb) return;
+
+    // Build consensus from the alert's matched pattern
+    const consensus: ConsensusData = {
+      localMatch: {
+        patternId: alert.matchedPattern.id,
+        label: alert.matchedPattern.label || alert.matchedPattern.id,
+        similarity: alert.matchedPattern.similarity,
+        outcome: alert.matchedPattern.outcome || alert.description,
+      },
+    };
+
+    // Try to get GraphCast prediction from seed
+    if (seedManager.activeSeed && seedManager.windGeoJSON?.features.length) {
+      // Find nearest grid point to vessel
+      let nearestFeature = seedManager.windGeoJSON.features[0];
+      let nearestDist = Infinity;
+      for (const feature of seedManager.windGeoJSON.features) {
+        const [fLon, fLat] = feature.geometry.coordinates;
+        const dist = Math.sqrt((fLat - vesselLocation.lat) ** 2 + (fLon - vesselLocation.lng) ** 2);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestFeature = feature;
+        }
+      }
+
+      const props = nearestFeature.properties;
+      if (props?.windSpeed) {
+        const windKts = props.windSpeed * 1.94384;
+        let outcome = windKts >= 34 ? 'Gale force winds' : windKts >= 22 ? 'Strong breeze' : 'Moderate conditions';
+        consensus.graphCastPrediction = {
+          outcome,
+          confidence: 0.82,
+          validTime: seedManager.forecastValidTime || new Date(),
+        };
+      }
+    }
+
+    setConsensusMap(prev => {
+      const next = new Map(prev);
+      next.set(alert.id, consensus);
+      return next;
+    });
+  }, [seedManager.activeSeed, seedManager.windGeoJSON, seedManager.forecastValidTime, vesselLocation]);
+
+  // Build consensus when alerts change
+  useEffect(() => {
+    activeAlerts.forEach(alert => {
+      if (!consensusMap.has(alert.id)) {
+        buildConsensus(alert);
+      }
+    });
+  }, [activeAlerts, buildConsensus, consensusMap]);
 
   useEffect(() => {
     async function init() {
-      // 1. Initialize Identity
+      // 1. Initialize SQLite Database
+      const db = await SQLite.openDatabaseAsync('mariners_grid.db');
+      dbRef.current = db;
+
+      // Initialize VecDB for pattern matching
+      const vecDb = new VecDB(db);
+      await vecDb.initialize().catch(e => console.warn('[App] VecDB init (extension may not be available):', e));
+      vecDbRef.current = vecDb;
+
+      // 2. Initialize Identity
       const idService = IdentityService.getInstance();
       const user = await idService.getOrInitializeIdentity();
       setIdentity(user);
-      
-      // 2. Connect to Signal K (NMEA 2000)
+
+      // 3. Connect to Signal K (NMEA 2000)
       skBridge.current.connect((delta) => {
         // Handle Signal K updates
         if (delta.updates) {
@@ -66,12 +163,36 @@ export default function App() {
         }
       });
 
-      // 3. Try to load local weather seed (Mock for now)
+      // 4. Initialize Pattern Matcher
       try {
-        // In a real scenario, this file would be downloaded or Airdropped
-        // const seed = await SeedReader.loadSeed(FileSystem.documentDirectory + 'current.seed.zst');
-        // const windData = SeedReader.extractWindData(seed, 0); // Current time step
-        // setForecastData(windDataToGeoJSON(windData));
+        const matcher = new PatternMatcher(db);
+        await matcher.initialize();
+
+        // Start monitoring with alert callback
+        matcher.start((alert) => {
+          console.log('[App] Pattern Alert:', alert.title);
+          setActiveAlerts(prev => {
+            // Don't add if already acknowledged
+            if (acknowledgedAlerts.has(alert.id)) return prev;
+            // Don't add duplicates
+            if (prev.some(a => a.id === alert.id)) return prev;
+            return [alert, ...prev];
+          });
+        });
+
+        // Connect Signal K telemetry to Pattern Matcher
+        skBridge.current.onTelemetry((snapshot) => {
+          matcher.processTelemetry(snapshot);
+        });
+
+        patternMatcherRef.current = matcher;
+        console.log('[App] Pattern Matcher initialized');
+      } catch (e) {
+        console.warn('[App] Pattern Matcher init failed:', e);
+      }
+
+      // 4. Try to load local weather seed (Mock for now)
+      try {
         console.log('[App] Ready to load weather seeds');
       } catch (e) {
         console.warn('[App] No weather seed found');
@@ -83,6 +204,7 @@ export default function App() {
 
     return () => {
       skBridge.current.disconnect();
+      patternMatcherRef.current?.stop();
     };
   }, []);
 
@@ -129,10 +251,18 @@ export default function App() {
       </View>
 
       <View style={styles.mapWrapper}>
-        <MarinerMap 
+        <MarinerMap
           vesselLocation={vesselLocation}
-          forecastData={forecastData}
+          forecastData={seedManager.windGeoJSON || forecastData}
           onReportHazard={handleReportHazard}
+        />
+
+        {/* Pattern Alerts with Consensus View */}
+        <PatternAlertStack
+          alerts={activeAlerts}
+          consensusMap={consensusMap}
+          onAcknowledge={handleAcknowledgeAlert}
+          maxVisible={3}
         />
       </View>
 
