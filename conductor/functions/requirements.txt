@@ -1,0 +1,22 @@
+# Mariner's AI Grid - Cloud Function Dependencies
+# SPDX-License-Identifier: Apache-2.0
+
+# Core slicer dependencies
+numpy>=1.26.0
+xarray>=2024.1.0
+pyarrow>=15.0.0
+zstandard>=0.22.0
+pydantic>=2.6.0
+
+# Cloud Function framework
+functions-framework>=3.5.0
+
+# FastAPI for local dev and alternative deployments
+fastapi>=0.109.0
+uvicorn>=0.27.0
+
+# ECMWF data access (optional - uses mock if unavailable)
+cdsapi>=0.7.0
+ecmwf-opendata>=0.3.26
+cfgrib>=0.9.12
+eccodes>=2.34.0

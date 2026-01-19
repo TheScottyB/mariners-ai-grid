@@ -31,24 +31,21 @@ dependencies = [
     "cfgrib>=0.9.12",            # GRIB to xarray bridge
     "xarray>=2024.1.0",          # N-dimensional arrays
     "numpy>=1.26.0",             # Numerical computing
-
     # ECMWF data access
     "cdsapi>=0.7.0",             # Copernicus Climate Data Store API
-
     # Output formats (Seed generation)
     "pyarrow>=15.0.0",           # Parquet read/write with zstd
     "protobuf>=5.26.0",          # Protocol Buffers for compact seeds
-
     # Geospatial utilities
     "pyproj>=3.6.0",             # Coordinate transformations
-
     # Compression
     "zstandard>=0.22.0",         # Zstandard compression
-
     # CLI & utilities
     "click>=8.1.0",              # CLI framework
     "rich>=13.7.0",              # Pretty terminal output
     "pydantic>=2.6.0",           # Data validation
+    "ecmwf-opendata>=0.3.26",
+    "pillow>=12.1.0",
 ]
 
 [project.optional-dependencies]
@@ -62,6 +59,12 @@ jax = [
     # JAX for ML inference (GraphCast compatibility)
     "jax>=0.4.25",
     "jaxlib>=0.4.25",
+]
+functions = [
+    # Cloud Function dependencies
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "functions-framework>=3.5.0",
 ]
 
 [project.scripts]
