@@ -56,6 +56,13 @@ Our "San Francisco to Hawaii" midpoint test confirms the **Maverick** architectu
 - **Output:** `.seed.zst` (Zstandard compressed Protobuf/Parquet).
 - **Logic:** 2.5-degree spatial buffering to prevent edge artifacts.
 
+#### ☁️ The "Cloud Slicer" Mechanism
+How do we get 10GB of live data to a satellite-connected phone? We don't.
+1.  **Request:** The app sends a tiny JSON payload (Lat/Lon/Radius) to our **Cloud Function**.
+2.  **Processing:** The Slicer pulls the 10GB global stream, crops it to the requested 500nm box, and prunes non-essential variables.
+3.  **Delivery:** The user receives a **~2.1 MB Seed** (Parquet/Protobuf) that contains *only* what they need.
+4.  **Cost:** The user pays for 2MB of bandwidth ($4.20), not 10GB.
+
 ### 2. The Mobile App (Frontend)
 - **Framework:** Expo SDK 54 (Managed Workflow + CNG).
 - **Identity:** "Shadow Auth" - Anonymous device-level identity via `expo-secure-store`.

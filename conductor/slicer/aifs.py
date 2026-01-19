@@ -127,6 +127,13 @@ class AIFSSlicer:
         )
 
     def _fetch_files(self, date, time, steps, sfc_params, pl_params, levels, target_sfc, target_pl):
+        # Optimization: Check if Global Master Files exist (from Ingest Cron)
+        # If 'target_sfc' points to a pre-existing file (like a symlink or global grib),
+        # we skip the network call.
+        if target_sfc.exists() and target_pl.exists():
+            logger.info(f"Using cached Master Files: {target_sfc}, {target_pl}")
+            return
+
         # Surface
         self.client.retrieve(
             date=date,
