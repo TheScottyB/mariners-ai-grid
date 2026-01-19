@@ -7,9 +7,7 @@
   },
   "build": {
     "base": {
-      "env": {
-        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "@rnmapbox-download-token"
-      }
+      "env": {}
     },
     "development": {
       "extends": "base",
