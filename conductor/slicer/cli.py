@@ -75,6 +75,16 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
             total=None
         )
 
+        # Parse variable list
+        if variables == "standard":
+            var_list = STANDARD_VARIABLES
+        elif variables == "minimal":
+            var_list = MINIMAL_VARIABLES
+        elif variables == "full":
+            var_list = FULL_VARIABLES
+        else:
+            var_list = [v.strip() for v in variables.split(",")]
+
         if offline:
             seed = slicer.slice(
                 bbox=bbox,

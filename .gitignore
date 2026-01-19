@@ -47,3 +47,7 @@ __pycache__/
 
 # Deployment telemetry logs
 .mag-telemetry/
+
+# Conductor seed cache and generated files
+conductor/test_seeds/**/.cache/
+conductor/test_seeds/**/*.seed.zst
