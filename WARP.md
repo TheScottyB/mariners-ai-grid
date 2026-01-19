@@ -14,9 +14,9 @@ All agents have **full local file system, bash command, and web access**. This i
 This app requires **edge AI inference** with modern hardware:
 
 ### iOS
-- **Minimum:** iPhone 11 (A13 Bionic), iOS 14.0+
+- **Minimum:** iPhone 11 (A13 Bionic), iOS 16.0+
 - **Recommended:** iPhone 12+ (A14+) for optimal AI performance
-- **Why iOS 14.0?** CoreML 4 provides better Neural Engine utilization for on-device GraphCast inference
+- **Why iOS 16.0?** Lock screen customization, Live Activities API, and modern privacy controls aligned with 2026 standards
 - **Build Target:** arm64 only (no x86_64 Intel Mac support)
 
 ### Android

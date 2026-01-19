@@ -76,7 +76,7 @@ How do we get 10GB of live data to a satellite-connected phone? We don't.
 
 ### Prerequisites
 **Device Requirements:**
-- **iOS:** iPhone 11 or newer (A13 Bionic+), iOS 14.0+
+- **iOS:** iPhone 11 or newer (A13 Bionic+), iOS 16.0+
 - **Android:** Snapdragon 865+ or equivalent, Android 8.0+ (API 26)
 - **Why?** Edge AI inference requires modern NPU/Neural Engine for acceptable performance
 

@@ -19,9 +19,9 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 *   **Framework:** Expo SDK 54 (Managed Workflow + CNG).
 *   **Language:** TypeScript (Strict Mode).
 *   **Minimum Deployment Targets:**
-    *   **iOS:** 14.0 (iPhone 11 / A13+, supports up to iOS 26)
+    *   **iOS:** 16.0 (iPhone 11 / A13+, supports up to iOS 26)
     *   **Android:** API 26 (Android 8.0, Snapdragon 865+ arm64-v8a)
-    *   **Rationale:** CoreML 4 (iOS 14+) and modern NPU required for edge AI inference
+    *   **Rationale:** iOS 16+ provides Live Activities, Dynamic Island support, and modern privacy APIs for 2026
 *   **Identity:** "Shadow Auth" (Device-Level Identity via `expo-secure-store`).
 *   **State Management:** TanStack Query (server/weather state) + Zustand (client UI state).
 *   **Maps:** Mapbox GL Native (`@rnmapbox/maps`).

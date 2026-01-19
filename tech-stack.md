@@ -4,7 +4,7 @@
 - **Framework:** Expo SDK (Latest Stable)
 - **Workflow:** Managed with Continuous Native Generation (CNG)
 - **Language:** TypeScript (Strict Mode)
-- **Minimum iOS:** 14.0 (iPhone 11 / A13 Bionic+)
+- **Minimum iOS:** 16.0 (iPhone 11 / A13 Bionic+)
 - **Minimum Android:** API 26 (Android 8.0)
 - **State Management:** TanStack Query (for weather data caching) + Zustand (UI state)
 
