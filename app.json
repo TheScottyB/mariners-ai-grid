@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.thescottybe.marinersaigrid",
-      "icon": "./assets/app.icon",
+      "icon": "./assets/app-icon.png",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Required to connect to your boat's Signal K server.",
         "NSLocationWhenInUseUsageDescription": "Required to show your current position on the weather grid.",

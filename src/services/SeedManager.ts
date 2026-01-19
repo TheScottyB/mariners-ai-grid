@@ -143,6 +143,45 @@ export class SeedManager {
   }
 
   /**
+   * Import a seed from local file (AirDrop, USB).
+   */
+  async importLocalSeed(
+    sourcePath: string,
+    source: SeedMetadata['source'] = 'airdrop'
+  ): Promise<SeedMetadata> {
+    const filename = sourcePath.split('/').pop() ?? 'unknown.seed';
+    const localPath = `${this.config.seedDirectory}${filename}`;
+
+    await FileSystem.copyAsync({ from: sourcePath, to: localPath });
+
+    const format = filename.endsWith('.parquet') ? 'parquet' : 'protobuf';
+    const parsed = await this.parseSeed(localPath, format);
+    const info = await FileSystem.getInfoAsync(localPath);
+    const size = info.exists ? info.size : 0;
+
+    const metadata: SeedMetadata = {
+      id: this.generateSeedId(filename),
+      filename,
+      format,
+      createdAt: parsed.timesteps[0]?.validTime ?? Date.now(),
+      downloadedAt: Date.now(),
+      expiresAt: Date.now() + this.config.defaultExpiryHours * 60 * 60 * 1000,
+      bounds: this.calculateBounds(parsed.timesteps[0]?.windData ?? []),
+      forecastStartTime: parsed.timesteps[0]?.validTime ?? Date.now(),
+      forecastEndTime: parsed.timesteps[parsed.timesteps.length - 1]?.validTime ?? Date.now(),
+      timestepCount: parsed.timesteps.length,
+      fileSizeBytes: size,
+      source,
+    };
+
+    this.metadataIndex.push(metadata);
+    await this.saveMetadataIndex();
+    this.seedCache.set(metadata.id, { metadata, timesteps: parsed.timesteps });
+
+    return metadata;
+  }
+
+  /**
    * Parse a Parquet seed file using Apache Arrow.
    */
   async parseParquetSeed(filePath: string): Promise<SeedTimestep[]> {
@@ -202,7 +241,6 @@ export class SeedManager {
       const windData = SeedReader.extractWindData(seed, 0);
       
       let validTime = Date.now();
-      // Handle createdAtIso type safety if it's optional or differently typed
       if (seed.createdAtIso) {
           try { validTime = new Date(seed.createdAtIso).getTime(); } catch {}
       }
@@ -235,7 +273,6 @@ export class SeedManager {
       if (meta.expiresAt < Date.now()) return false;
       if (lat < meta.bounds.south || lat > meta.bounds.north) return false;
       if (lon < meta.bounds.west || lon > meta.bounds.east) return false;
-      // if (time < meta.forecastStartTime || time > meta.forecastEndTime) return false; // Relax time check for MVP
       return true;
     });
 
@@ -281,7 +318,7 @@ export class SeedManager {
     const filePath = `${this.config.seedDirectory}${metadata.filename}`;
 
     try {
-        await deleteAsync(filePath, { idempotent: true });
+        await FileSystem.deleteAsync(filePath, { idempotent: true });
     } catch (e) {
         console.warn(`[SeedManager] Failed to delete file: ${filePath}`, e);
     }
@@ -321,7 +358,9 @@ export class SeedManager {
   private async cleanupExpiredSeeds(): Promise<void> {
     const now = Date.now();
     const expired = this.metadataIndex.filter((m) => m.expiresAt < now);
-    // Implementation omitted for brevity
+    for (const meta of expired) {
+        await this.deleteSeed(meta.id);
+    }
   }
 
   private generateSeedId(filename: string): string {
