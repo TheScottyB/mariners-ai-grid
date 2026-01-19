@@ -55,6 +55,13 @@
             "compileSdkVersion": 36
           }
         }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsDownloadToken": "MAPBOX_SECRET_TOKEN",
+          "RNMapboxMapsVersion": "11.0.0"
+        }
       ]
     ],
     "extra": {

@@ -18,6 +18,7 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 ### **A. Mobile Application (Frontend)**
 *   **Framework:** Expo SDK 54 (Managed Workflow + CNG).
 *   **Language:** TypeScript (Strict Mode).
+*   **Identity:** "Shadow Auth" (Device-Level Identity via `expo-secure-store`).
 *   **State Management:** TanStack Query (server/weather state) + Zustand (client UI state).
 *   **Maps:** Mapbox GL Native (`@rnmapbox/maps`).
 *   **Storage:** `expo-sqlite/vec` (Vector storage for social hazards), Parquet (Weather Seeds).
@@ -30,6 +31,7 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 
 ### **C. The Bridge (Hardware)**
 *   **Protocol:** Signal K (WebSocket) over NMEA 2000.
+*   **Implementation:** `SignalKBridge.ts` using `ReconnectingWebSocket` and `expo-network`.
 *   **Function:** Ingests local boat sensors (Wind, Barometer, GPS) to "ground truth" the AI model.
 
 ---
@@ -39,16 +41,28 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 ### ✅ **Completed**
 *   **Project Structure:** Monorepo-style setup established (`app/` for mobile, `conductor/` for backend).
 *   **Dependency Management:** Migrated Python tooling to `uv` for speed and determinism.
+*   **Identity:** Implemented "Shadow Auth" service for anonymous, device-level user tracking.
+*   **The Bridge:** Functional `SignalKBridge` for real-time NMEA 2000 telemetry ingest.
 *   **The Slicer (Prototype):**
     *   Functional `ECMWFHRESSlicer` logic.
     *   `BoundingBox` and `VariablePruner` logic implemented.
     *   Export support for **Parquet** and **Protobuf+Zstd**.
+    *   Shared Schema: `weather_seed.proto` defined for cross-platform data contract.
     *   CLI tool (`mag-slicer`) operational.
 *   **Testing:** Full test suite for the Slicer is passing (including fixed Protobuf roundtrip fidelity).
+*   **MarinerMap Tactical Display:**
+    *   `@rnmapbox/maps` integrated with Expo SDK 54 config plugin.
+    *   Wind Barb layer with dynamic icon selection (WMO standard).
+    *   "Waze" Social Hazard layer with SQLite spatial queries.
+    *   Real-time Vessel Marker with heading rotation.
+    *   **Data Freshness Warning System:** Amber (6-12h) / Red (12h+) banners.
+    *   **Power Save Mode:** Auto-triggers on low battery or steady tack.
+*   **Offline Tile Manager:** Pre-download 500nm route corridors for deep-water passages.
+*   **Wind Barb Assets:** WMO-standard barb icons (calm → 65+ kt) generated.
 
 ### 🚧 **In Progress**
-*   **Mobile App Scaffold:** Initial Expo setup (pending UI implementation).
 *   **AI Model Integration:** GraphCast ONNX runtime scaffolding.
+*   **Hazard Reporting UI:** Long-press to report crowdsourced hazards.
 
 ---
 
@@ -65,9 +79,10 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 
 ## 5. Next Immediate Actions (for AI Agents)
 
-1.  **Claude Code (Mobile):** Begin scaffolding the React Native UI. Focus on the "Map View" and "Route Planning" screens using the design principles defined in `app.json`.
-2.  **Gemini Conductor (Backend):** Refine the `slicer.py` logic to handle real ECMWF API tokens and implement the "Data Freshness" metadata tagging.
+1.  **Claude Code (Mobile):** ~~Implement the "MarinerMap" component~~ ✅ **DONE** — Now wire MarinerMap to App.tsx and create the Hazard Reporting modal.
+2.  **Gemini Conductor (Backend):** Test `AIFSSlicer` with live ECMWF Open Data downloads; implement Data Freshness timestamp tagging.
 3.  **Integration:** Create a shared schema (Protobuf definitions) that both the Python backend and TypeScript frontend adhere to for Seed parsing.
+4.  **UX Polish:** Add haptic feedback on hazard report submission; implement route waypoint input UI.
 
 ---
 

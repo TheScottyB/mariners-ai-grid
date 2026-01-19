@@ -1,56 +1,88 @@
+import * as Network from 'expo-network';
+import ReconnectingWebSocket from 'reconnecting-websocket';
+
 /**
- * Mariner's AI Grid - Signal K Bridge
- * Ingests real-time NMEA 2000 data via Signal K WebSocket.
+ * SignalKBridge connects the Expo app to the boat's NMEA 2000 network.
+ * It acts as the "Truth Layer" auditor, pulling real-time sensor data
+ * to validate and ground the AI forecasts.
+ * 
+ * Focuses on:
+ * - PGN 130306 (Wind)
+ * - PGN 130311 (Pressure)
+ * - PGN 129025 (Position)
  */
-
-export interface SignalKData {
-  path: string;
-  value: any;
-  timestamp: string;
-}
-
 export class SignalKBridge {
-  private socket: WebSocket | null = null;
-  private url: string;
+  private ws: ReconnectingWebSocket | null = null;
+  private serverUrl: string = "ws://signalk.local:3000/signalk/v1/stream";
 
-  constructor(host: string = 'localhost', port: number = 3000) {
-    this.url = `ws://${host}:${port}/signalk/v1/stream?subscribe=all`;
-  }
+  /**
+   * Initializes the connection and subscribes to marine-critical data.
+   */
+  async connect(onDataReceived: (data: any) => void) {
+    const state = await Network.getNetworkStateAsync();
+    
+    // Only connect if we are on a Local Network (Boat WiFi)
+    // state.isMetered is often true on satellite (Starlink), 
+    // but signalk.local is local traffic.
+    if (!state.isConnected) {
+      console.warn("⚠️ No network connection. Telemetry paused.");
+      return;
+    }
 
-  connect(onData: (data: SignalKData) => void) {
-    console.log(`Connecting to Signal K: ${this.url}`);
-    this.socket = new WebSocket(this.url);
+    console.log(`⚓ Attempting connection to Signal K: ${this.serverUrl}`);
+    
+    // Using native WebSocket constructor via ReconnectingWebSocket wrapper
+    this.ws = new ReconnectingWebSocket(this.serverUrl, [], {
+      constructor: WebSocket,
+      connectionTimeout: 5000,
+    });
 
-    this.socket.onmessage = (event) => {
+    this.ws.onopen = () => {
+      console.log("⚓ Connected to Signal K / NMEA 2000 Bridge");
+      
+      // Subscribe to Specific PGNs via Signal K Paths
+      const subscription = {
+        context: "vessels.self",
+        subscribe: [
+          { path: "environment.wind.speedApparent", period: 1000 },
+          { path: "environment.outside.pressure", period: 5000 },
+          { path: "navigation.position", period: 1000 }
+        ]
+      };
+      this.ws?.send(JSON.stringify(subscription));
+    };
+
+    this.ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data);
-        if (msg.updates) {
-          msg.updates.forEach((update: any) => {
-            update.values.forEach((val: any) => {
-              onData({
-                path: val.path,
-                value: val.value,
-                timestamp: update.timestamp,
-              });
-            });
-          });
-        }
+        const delta = JSON.parse(event.data);
+        onDataReceived(delta);
       } catch (e) {
-        console.error('Signal K Parse Error:', e);
+        console.error("Signal K Parse Error:", e);
       }
     };
 
-    this.socket.onerror = (error) => {
-      console.error('Signal K WebSocket Error:', error);
+    this.ws.onerror = (err) => {
+      console.error("Signal K Bridge Error:", err.message);
     };
 
-    this.socket.onclose = () => {
-      console.log('Signal K Connection Closed');
+    this.ws.onclose = () => {
+      console.log("⚓ Signal K Bridge Connection Closed");
     };
   }
 
+  /**
+   * Updates the server URL (e.g., if discovered via Bonjour/mDNS)
+   */
+  setServerUrl(url: string) {
+    this.serverUrl = url;
+    if (this.ws) {
+      this.disconnect();
+      // Re-connect logic would typically be triggered by UI or manager
+    }
+  }
+
   disconnect() {
-    this.socket?.close();
-    this.socket = null;
+    this.ws?.close();
+    this.ws = null;
   }
 }

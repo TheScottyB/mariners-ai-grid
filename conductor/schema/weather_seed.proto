@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package mariner.v1;
+
+// WeatherSeed is the compressed regional payload sent to the boat.
+// Target size: < 5MB (compressed)
+message WeatherSeed {
+  // Identity
+  string seed_id = 1;
+  string model_source = 2; // e.g., "ecmwf_aifs", "ecmwf_hres"
+  string model_run_iso = 3; // ISO8601 timestamp of model initialization (e.g. 2026-01-18T00:00:00Z)
+  string created_at_iso = 4;
+
+  // Spatial Domain
+  BoundingBox bounding_box = 5;
+  float resolution_deg = 6; // e.g., 0.25
+
+  // Temporal Domain
+  string forecast_start_iso = 7;
+  string forecast_end_iso = 8;
+  int32 time_step_hours = 9;
+  repeated string time_steps_iso = 10;
+
+  // Data
+  // Coordinate arrays are stored once to save space
+  repeated float latitudes = 11;
+  repeated float longitudes = 12;
+
+  // Variable Data
+  // Map of variable name (e.g., "u10", "msl") to its data payload
+  // We use a list of NamedVariable because map<string, VariableData> isn't always efficient/supported everywhere
+  repeated NamedVariable variables = 13;
+
+  // Metadata
+  map<string, string> meta_tags = 14;
+}
+
+message BoundingBox {
+  float lat_min = 1;
+  float lat_max = 2;
+  float lon_min = 3;
+  float lon_max = 4;
+}
+
+message NamedVariable {
+  string name = 1;
+  VariableData data = 2;
+}
+
+message VariableData {
+  // Shape: [time, lat, lon] flattened
+  // For maximum compression, we use packed floats or bytes (if quantized)
+  
+  // Standard float32 array
+  repeated float values = 1 [packed = true];
+  
+  // Future optimization: Quantized integers with scale/offset
+  // repeated int32 quantized_values = 2 [packed = true];
+  // float scale_factor = 3;
+  // float add_offset = 4;
+}
