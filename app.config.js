@@ -101,7 +101,8 @@ export default ({ config }) => {
       eas: {
         projectId: "dd3b8b54-8d49-43b1-bea7-669fd80e10c9"
       },
-      signalKUrl: process.env.EXPO_PUBLIC_SIGNALK_URL || (IS_DEV ? "ws://localhost:3000/signalk/v1/stream" : "ws://signalk.local:3000/signalk/v1/stream")
+      signalKUrl: process.env.EXPO_PUBLIC_SIGNALK_URL || (IS_DEV ? "ws://localhost:3000/signalk/v1/stream" : "ws://signalk.local:3000/signalk/v1/stream"),
+      gridApiUrl: process.env.EXPO_PUBLIC_GRID_API_URL || (IS_DEV ? "http://localhost:3001" : "https://api.marinersai.grid"),
     }
   };
 };

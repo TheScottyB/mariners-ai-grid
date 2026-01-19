@@ -48,6 +48,7 @@ import {
   type DownloadProgressData,
 } from 'expo-file-system/legacy';
 import * as Network from 'expo-network';
+import Constants from 'expo-constants';
 
 import { SignalKBridge } from '../services/SignalKBridge';
 import { SeedManager, SeedMetadata } from '../services/SeedManager';
@@ -717,7 +718,7 @@ export const FirstWatchOnboarding: React.FC<FirstWatchOnboardingProps> = ({
     verify: 'pending',
     code: 'pending',
   });
-  const [signalKUrl, setSignalKUrl] = useState('ws://192.168.1.1:3000/signalk/v1/stream');
+  const [signalKUrl, setSignalKUrl] = useState(Constants.expoConfig?.extra?.signalKUrl || 'ws://192.168.1.1:3000/signalk/v1/stream');
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [seedMetadata, setSeedMetadata] = useState<SeedMetadata | null>(null);
