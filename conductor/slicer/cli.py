@@ -72,9 +72,10 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
     # Create bounding box
     bbox = BoundingBox.from_center(lat, lon, radius)
 
-    console.print(f"\n[dim]Region:[/] {bbox.lat_min:.2f}° to {bbox.lat_max:.2f}°N, "
-                  f"{bbox.lon_min:.2f}° to {bbox.lon_max:.2f}°E")
-    console.print(f"[dim]Coverage:[/] {bbox.area_sq_nm:,.0f} sq nm")
+    console.print(f"\n[dim]Region:[/]
+    {bbox.lat_min:.2f}° to {bbox.lat_max:.2f}°N, {bbox.lon_min:.2f}° to {bbox.lon_max:.2f}°E")
+    console.print(f"[dim]Coverage:[/]
+    {bbox.area_sq_nm:,.0f} sq nm")
 
     # Determine variable set
     var_map = {
@@ -84,8 +85,10 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
     }
     var_list = var_map.get(variables, STANDARD_VARIABLES)
 
-    console.print(f"[dim]Variables:[/] {len(var_list)} ({variables})")
-    console.print(f"[dim]Forecast:[/] {hours}h at {step}h intervals")
+    console.print(f"[dim]Variables:[/]
+    {len(var_list)} ({variables})")
+    console.print(f"[dim]Forecast:[/]
+    {hours}h at {step}h intervals")
 
     # Initialize slicer
     slicer = ECMWFHRESSlicer(
@@ -151,12 +154,15 @@ def slice(lat: float, lon: float, radius: float, hours: int, step: int,
     console.print("\n[bold]Export Results:[/]")
 
     for fmt, path, stats in export_results:
+        costs = stats.cost_estimates
+        cost_str = "\n".join([f"  {k}: ${v:.2f}" for k, v in costs.items()])
+        
         console.print(Panel.fit(
             f"[bold]{fmt}[/]\n"
             f"File: {path}\n"
             f"Size: [green]{stats.output_bytes / 1024:.1f} KB[/]\n"
             f"Compression: [cyan]{stats.compression_ratio:.1f}x[/]\n"
-            f"Est. Starlink Cost: [yellow]${stats.estimated_transfer_cost_usd:.2f}[/]",
+            f"[yellow]Satellite Costs (Est.):[/]\n{cost_str}",
             border_style="green"
         ))
 
@@ -244,19 +250,26 @@ def demo():
     comp_table.add_column("Format", style="cyan")
     comp_table.add_column("Size", style="green")
     comp_table.add_column("Compression", style="yellow")
-    comp_table.add_column("Starlink Cost", style="magenta")
+    comp_table.add_column("Cost: Starlink", style="magenta")
+    comp_table.add_column("Cost: Iridium", style="red")
+
+    # Extract costs safely
+    pq_costs = comparison['parquet']['cost_estimates']
+    pb_costs = comparison['protobuf']['cost_estimates']
 
     comp_table.add_row(
         "Parquet",
         f"{comparison['parquet']['size_kb']:.1f} KB",
         f"{comparison['parquet']['compression_ratio']:.1f}x",
-        f"${comparison['parquet']['cost_usd']:.2f}",
+        f"${pq_costs['starlink']:.2f}",
+        f"${pq_costs['iridium_certus_100']:.2f}",
     )
     comp_table.add_row(
         "Protobuf+zstd",
         f"{comparison['protobuf']['size_kb']:.1f} KB",
         f"{comparison['protobuf']['compression_ratio']:.1f}x",
-        f"${comparison['protobuf']['cost_usd']:.2f}",
+        f"${pb_costs['starlink']:.2f}",
+        f"${pb_costs['iridium_certus_100']:.2f}",
     )
 
     console.print(comp_table)
@@ -269,8 +282,10 @@ def demo():
         "• Variable pruning: 100+ variables → 8 marine-essential\n"
         "• Precision quantization: reduces entropy for better compression\n"
         "• Zstandard compression: 70-80% size reduction\n\n"
-        f"[bold]Recommended format:[/] {comparison['recommendation'].upper()}\n"
-        f"[bold]Files saved to:[/] {output_dir.absolute()}",
+        f"[bold]Recommended format:[/]
+    f"{comparison['recommendation'].upper()}"
+        f"[bold]Files saved to:[/]
+    f"{output_dir.absolute()}",
         title="Summary",
         border_style="green"
     ))
@@ -302,7 +317,7 @@ def info(seed_file: Path):
         table.add_row("Model Source", seed.model_source)
         table.add_row("Model Run", seed.model_run.strftime("%Y-%m-%d %H:%M UTC"))
         table.add_row("Forecast Range",
-                      f"{seed.forecast_start.strftime('%m/%d %H:%M')} → "
+                      f"{seed.forecast_start.strftime('%m/%d %H:%M')}
                       f"{seed.forecast_end.strftime('%m/%d %H:%M')}")
         table.add_row("Resolution", f"{seed.resolution_deg}°")
         table.add_row("Grid Shape", f"{seed.shape}")
@@ -338,6 +353,7 @@ def estimate(lat: float, lon: float, radius: float):
     """
     from slicer.core import BoundingBox
     from slicer.variables import VariablePruner
+    from slicer.cost_model import SatelliteCostModel
 
     bbox = BoundingBox.from_center(lat, lon, radius)
     pruner = VariablePruner("standard")
@@ -348,6 +364,9 @@ def estimate(lat: float, lon: float, radius: float):
     time_steps = 25  # 0-72h at 3h intervals
 
     estimated_mb = pruner.estimate_pruned_size_mb(lat_points, lon_points, time_steps)
+    
+    # Calculate costs
+    costs = SatelliteCostModel.get_all_estimates(int(estimated_mb * 1024 * 1024))
 
     table = Table(title="Size Estimate")
     table.add_column("Metric", style="cyan")
@@ -359,8 +378,11 @@ def estimate(lat: float, lon: float, radius: float):
     table.add_row("Time Steps", str(time_steps))
     table.add_row("Variables", str(len(pruner.variables)))
     table.add_row("Est. Compressed Size", f"{estimated_mb:.2f} MB")
-    table.add_row("Est. Starlink Cost", f"${estimated_mb * 2:.2f}")
-    table.add_row("Est. Iridium Cost", f"${estimated_mb * 7:.2f}")
+    
+    table.add_row("Cost: Starlink", f"${costs['starlink']:.2f}")
+    table.add_row("Cost: Iridium Certus 100", f"${costs['iridium_certus_100']:.2f}")
+    table.add_row("Cost: Iridium Certus 700", f"${costs['iridium_certus_700']:.2f}")
+    table.add_row("Cost: KVH VSAT", f"${costs['kvh_vsat']:.2f}")
 
     console.print(table)
 

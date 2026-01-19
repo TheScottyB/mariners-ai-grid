@@ -49,18 +49,33 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "15.1",
+            "extraPods": [
+              {
+                "name": "sqlite-vec",
+                "podspec": "./plugins/with-sqlite-vec/sqlite-vec.podspec"
+              }
+            ]
           },
           "android": {
-            "compileSdkVersion": 36
+            "compileSdkVersion": 36,
+            "extraMavenRepos": [],
+            "enableShrinkResources": false
           }
         }
       ],
       [
         "@rnmapbox/maps",
         {
-          "RNMapboxMapsDownloadToken": "MAPBOX_SECRET_TOKEN",
+          "RNMapboxMapsDownloadToken": "sk.placeholder_secret_token",
           "RNMapboxMapsVersion": "11.0.0"
+        }
+      ],
+      [
+        "./plugins/with-sqlite-vec/withSqliteVec.js",
+        {
+          "version": "0.1.6",
+          "debug": true
         }
       ]
     ],

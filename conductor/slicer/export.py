@@ -35,7 +35,7 @@ class ExportStats:
     variables: list[str]
     grid_points: int
     time_steps: int
-    estimated_transfer_cost_usd: float
+    cost_estimates: dict[str, float]  # Provider -> Cost USD
 
 
 class SeedExporter:
@@ -98,6 +98,7 @@ class SeedExporter:
         import pyarrow.parquet as pq
 
         from slicer.variables import MARINE_VARIABLES, VariablePruner
+        from slicer.cost_model import SatelliteCostModel
 
         if filename is None:
             filename = f"{seed.seed_id}.parquet"
@@ -160,7 +161,7 @@ class SeedExporter:
             variables=list(seed.variables.keys()),
             grid_points=n_lats * n_lons,
             time_steps=n_times,
-            estimated_transfer_cost_usd=output_bytes / (1024 * 1024) * 2.0,  # Starlink rate
+            cost_estimates=SatelliteCostModel.get_all_estimates(output_bytes),
         )
 
         logger.info(
@@ -194,71 +195,83 @@ class SeedExporter:
             Tuple of (output path, export statistics)
         """
         import zstandard as zstd
-        from google.protobuf import descriptor_pb2
+        from schema import weather_seed_pb2
+        from slicer.variables import MARINE_VARIABLES
+        from slicer.compression import Quantizer
+        from slicer.quantization_config import get_quantization_rule
+        from slicer.cost_model import SatelliteCostModel
 
         if filename is None:
             filename = f"{seed.seed_id}.seed.zst"
 
         output_path = self.output_dir / filename
 
-        # Build binary payload
-        # Format: Header + Metadata JSON + Variable arrays (raw float32)
+        # 1. Build Protobuf Message
+        pb_seed = weather_seed_pb2.WeatherSeed()
+        pb_seed.seed_id = seed.seed_id
+        pb_seed.model_source = seed.model_source
+        pb_seed.model_run_iso = seed.model_run.isoformat()
+        pb_seed.created_at_iso = seed.created_at.isoformat()
+        
+        # Spatial
+        pb_seed.bounding_box.lat_min = seed.bounding_box.lat_min
+        pb_seed.bounding_box.lat_max = seed.bounding_box.lat_max
+        pb_seed.bounding_box.lon_min = seed.bounding_box.lon_min
+        pb_seed.bounding_box.lon_max = seed.bounding_box.lon_max
+        pb_seed.resolution_deg = seed.resolution_deg
+        
+        # Temporal
+        pb_seed.forecast_start_iso = seed.forecast_start.isoformat()
+        pb_seed.forecast_end_iso = seed.forecast_end.isoformat()
+        pb_seed.time_step_hours = seed.time_step_hours
+        pb_seed.time_steps_iso.extend([t.isoformat() for t in seed.times])
+        
+        # Coordinates
+        pb_seed.latitudes.extend(seed.latitudes)
+        pb_seed.longitudes.extend(seed.longitudes)
+        
+        # Variable Data
         input_bytes = 0
-
-        # Metadata section
-        metadata = {
-            "seed_id": seed.seed_id,
-            "model_source": seed.model_source,
-            "model_run": seed.model_run.isoformat(),
-            "bounding_box": seed.bounding_box.to_dict(),
-            "resolution_deg": seed.resolution_deg,
-            "forecast_start": seed.forecast_start.isoformat(),
-            "forecast_end": seed.forecast_end.isoformat(),
-            "time_step_hours": seed.time_step_hours,
-            "times": [t.isoformat() for t in seed.times],
-            "shape": list(seed.shape),
-            "variables": sorted(seed.variables.keys()),
-            "latitudes": seed.latitudes.tolist(),
-            "longitudes": seed.longitudes.tolist(),
-        }
-
-        metadata_json = json.dumps(metadata, separators=(",", ":")).encode("utf-8")
-
-        # Build raw binary payload
-        buffer = io.BytesIO()
-
-        # Magic header
-        buffer.write(b"MAGSEED1")  # 8 bytes
-
-        # Metadata length + content
-        buffer.write(len(metadata_json).to_bytes(4, "little"))
-        buffer.write(metadata_json)
-
-        # Variable arrays (quantized float32)
-        from slicer.variables import MARINE_VARIABLES, VariablePruner
-        pruner = VariablePruner("full")
-
+        
         for var_name in sorted(seed.variables.keys()):
             arr = seed.variables[var_name]
             input_bytes += arr.nbytes
+            flat = arr.flatten() # Flatten 3D -> 1D
+            
+            pb_var = pb_seed.variables.add()
+            pb_var.name = var_name
 
-            # Quantize
-            if quantize and var_name in MARINE_VARIABLES:
-                var_def = MARINE_VARIABLES[var_name]
-                arr = pruner.quantize_array(arr, var_def)
+            # Apply advanced quantization
+            if quantize:
+                rule = get_quantization_rule(var_name)
+                # Apply variable-specific step/bits
+                q_arr, params = Quantizer.compress_variable(
+                    flat, 
+                    step=rule.step, 
+                    precision_bits=rule.bits
+                )
+                
+                pb_var.data.quantized_values.extend(q_arr.tolist())
+                pb_var.data.scale_factor = params.scale
+                pb_var.data.add_offset = params.offset
+            else:
+                # Fallback to raw floats (e.g. unlisted vars or quantize=False)
+                pb_var.data.values.extend(flat.tolist())
 
-            # Write as raw float32
-            buffer.write(arr.astype(np.float32).tobytes())
+        # Metadata
+        for k, v in seed.metadata.items():
+            pb_seed.meta_tags[k] = str(v)
 
-        raw_data = buffer.getvalue()
+        # 2. Serialize to bytes
+        serialized_proto = pb_seed.SerializeToString()
 
-        # Compress with zstd
-        compressor = zstd.ZstdCompressor(level=self.compression_level)
-        compressed = compressor.compress(raw_data)
+        # 3. Compress with Zstandard
+        cctx = zstd.ZstdCompressor(level=self.compression_level)
+        compressed_data = cctx.compress(serialized_proto)
 
-        # Write to file
+        # 4. Write to file
         with open(output_path, "wb") as f:
-            f.write(compressed)
+            f.write(compressed_data)
 
         output_bytes = output_path.stat().st_size
 
@@ -270,7 +283,7 @@ class SeedExporter:
             variables=list(seed.variables.keys()),
             grid_points=len(seed.latitudes) * len(seed.longitudes),
             time_steps=len(seed.times),
-            estimated_transfer_cost_usd=output_bytes / (1024 * 1024) * 2.0,
+            cost_estimates=SatelliteCostModel.get_all_estimates(output_bytes),
         )
 
         logger.info(
@@ -284,56 +297,76 @@ class SeedExporter:
     def read_protobuf_seed(filepath: Path) -> "WeatherSeed":
         """
         Read a .seed.zst file back into a WeatherSeed.
-
-        For mobile integration, this would be implemented in Swift/Kotlin
-        to read Seeds directly on-device.
+        Uses the shared Protobuf schema.
         """
         import zstandard as zstd
         from slicer.core import BoundingBox, WeatherSeed
+        from schema import weather_seed_pb2
+        from slicer.compression import Quantizer, QuantizationParams
         from datetime import datetime
 
-        # Decompress
+        # 1. Decompress
         with open(filepath, "rb") as f:
             compressed = f.read()
 
-        decompressor = zstd.ZstdDecompressor()
-        raw_data = decompressor.decompress(compressed)
-        buffer = io.BytesIO(raw_data)
+        dctx = zstd.ZstdDecompressor()
+        serialized_proto = dctx.decompress(compressed)
 
-        # Read header
-        magic = buffer.read(8)
-        if magic != b"MAGSEED1":
-            raise ValueError(f"Invalid seed file magic: {magic}")
+        # 2. Parse Protobuf
+        pb_seed = weather_seed_pb2.WeatherSeed()
+        pb_seed.ParseFromString(serialized_proto)
 
-        # Read metadata
-        meta_len = int.from_bytes(buffer.read(4), "little")
-        metadata = json.loads(buffer.read(meta_len).decode("utf-8"))
-
-        # Read variable arrays
-        shape = tuple(metadata["shape"])
-        n_elements = shape[0] * shape[1] * shape[2]
-
+        # 3. Reconstruct WeatherSeed
+        
+        # Coordinates
+        lats = np.array(pb_seed.latitudes, dtype=np.float32)
+        lons = np.array(pb_seed.longitudes, dtype=np.float32)
+        times = [datetime.fromisoformat(t) for t in pb_seed.time_steps_iso]
+        
+        # Variables
+        # Shape: (time, lat, lon)
+        shape = (len(times), len(lats), len(lons))
         variables = {}
-        for var_name in metadata["variables"]:
-            raw = buffer.read(n_elements * 4)  # float32
-            arr = np.frombuffer(raw, dtype=np.float32).reshape(shape)
-            variables[var_name] = arr
+        
+        for pb_var in pb_seed.variables:
+            if len(pb_var.data.quantized_values) > 0:
+                # Decompress quantized
+                q_arr = np.array(pb_var.data.quantized_values, dtype=np.int32)
+                params = QuantizationParams(
+                    scale=pb_var.data.scale_factor,
+                    offset=pb_var.data.add_offset,
+                    min_val=0, max_val=0, dtype=np.int32 # Unused for decompression
+                )
+                flat_arr = Quantizer.decompress_variable(q_arr, params)
+            else:
+                # Read raw
+                flat_arr = np.array(pb_var.data.values, dtype=np.float32)
+                
+            if len(flat_arr) > 0:
+                variables[pb_var.name] = flat_arr.reshape(shape)
+            else:
+                variables[pb_var.name] = np.zeros(shape, dtype=np.float32)
 
         return WeatherSeed(
-            seed_id=metadata["seed_id"],
-            created_at=datetime.now(),  # Not stored in seed
-            model_source=metadata["model_source"],
-            model_run=datetime.fromisoformat(metadata["model_run"]),
-            bounding_box=BoundingBox(**metadata["bounding_box"]),
-            resolution_deg=metadata["resolution_deg"],
-            forecast_start=datetime.fromisoformat(metadata["forecast_start"]),
-            forecast_end=datetime.fromisoformat(metadata["forecast_end"]),
-            time_step_hours=metadata["time_step_hours"],
+            seed_id=pb_seed.seed_id,
+            created_at=datetime.fromisoformat(pb_seed.created_at_iso),
+            model_source=pb_seed.model_source,
+            model_run=datetime.fromisoformat(pb_seed.model_run_iso),
+            bounding_box=BoundingBox(
+                lat_min=pb_seed.bounding_box.lat_min,
+                lat_max=pb_seed.bounding_box.lat_max,
+                lon_min=pb_seed.bounding_box.lon_min,
+                lon_max=pb_seed.bounding_box.lon_max
+            ),
+            resolution_deg=pb_seed.resolution_deg,
+            forecast_start=datetime.fromisoformat(pb_seed.forecast_start_iso),
+            forecast_end=datetime.fromisoformat(pb_seed.forecast_end_iso),
+            time_step_hours=pb_seed.time_step_hours,
             variables=variables,
-            latitudes=np.array(metadata["latitudes"], dtype=np.float32),
-            longitudes=np.array(metadata["longitudes"], dtype=np.float32),
-            times=[datetime.fromisoformat(t) for t in metadata["times"]],
-            metadata={},
+            latitudes=lats,
+            longitudes=lons,
+            times=times,
+            metadata=dict(pb_seed.meta_tags),
         )
 
 
@@ -353,13 +386,13 @@ def compare_formats(seed: "WeatherSeed", output_dir: Path) -> dict:
             "path": str(parquet_path),
             "size_kb": parquet_stats.output_bytes / 1024,
             "compression_ratio": parquet_stats.compression_ratio,
-            "cost_usd": parquet_stats.estimated_transfer_cost_usd,
+            "cost_estimates": parquet_stats.cost_estimates,
         },
         "protobuf": {
             "path": str(proto_path),
             "size_kb": proto_stats.output_bytes / 1024,
             "compression_ratio": proto_stats.compression_ratio,
-            "cost_usd": proto_stats.estimated_transfer_cost_usd,
+            "cost_estimates": proto_stats.cost_estimates,
         },
         "recommendation": (
             "protobuf" if proto_stats.output_bytes < parquet_stats.output_bytes

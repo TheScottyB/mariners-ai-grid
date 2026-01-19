@@ -51,11 +51,12 @@ message VariableData {
   // Shape: [time, lat, lon] flattened
   // For maximum compression, we use packed floats or bytes (if quantized)
   
-  // Standard float32 array
+  // Standard float32 array (Legacy/High Precision)
   repeated float values = 1 [packed = true];
   
-  // Future optimization: Quantized integers with scale/offset
-  // repeated int32 quantized_values = 2 [packed = true];
-  // float scale_factor = 3;
-  // float add_offset = 4;
+  // Quantized integers (Preferred for satellite)
+  // Encoded as: original = offset + (quantized * scale)
+  repeated int32 quantized_values = 2 [packed = true];
+  float scale_factor = 3;
+  float add_offset = 4;
 }
