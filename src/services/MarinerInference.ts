@@ -3,6 +3,7 @@ import * as ort from 'onnxruntime-react-native';
 import { File } from 'expo-file-system/next';
 import { Buffer } from 'buffer';
 import { WeatherSeed } from '../schema/schema/weather_seed';
+import { windDataToGeoJSON } from '../utils/geoUtils';
 
 /**
  * MarinerInference handles the local GraphCast execution.
@@ -50,14 +51,17 @@ export class MarinerInference {
       const fh = file.open();
       const buffer = Buffer.from(fh.readBytes(fh.size ?? 0));
       
-      // 2. Prepare Tensors (U/V Wind, Pressure, Geopotential, etc.)
-      const inputFeeds = await this.prepareTensors(buffer);
+      // 2. Decode Seed
+      const seed = WeatherSeed.decode(new Uint8Array(buffer));
+      
+      // 3. Prepare Tensors (U/V Wind, Pressure, Geopotential, etc.)
+      const inputFeeds = await this.prepareTensors(seed);
 
-      // 3. Run Inference (Async execution on NPU)
+      // 4. Run Inference (Async execution on NPU)
       const results = await this.session.run(inputFeeds);
 
-      // 4. Post-process (Wind magnitude, Wave hazards)
-      return this.postProcess(results);
+      // 5. Post-process (Wind magnitude, Wave hazards)
+      return this.postProcess(results, seed);
       
     } catch (error) {
       console.error('[Inference] Forecast execution failed:', error);
@@ -65,9 +69,7 @@ export class MarinerInference {
     }
   }
 
-  private async prepareTensors(buffer: Buffer): Promise<Record<string, ort.Tensor>> {
-    const seed = WeatherSeed.decode(new Uint8Array(buffer));
-    
+  private async prepareTensors(seed: WeatherSeed): Promise<Record<string, ort.Tensor>> {
     // Total size calculation for tensor allocation
     const timeSteps = seed.timeStepsIso.length || 1;
     const latPoints = seed.latitudes.length;
@@ -107,8 +109,51 @@ export class MarinerInference {
     }; 
   }
 
-  private postProcess(results: ort.InferenceSession.ReturnType) {
+  private postProcess(results: ort.InferenceSession.ReturnType, seed: WeatherSeed) {
     console.log('[Inference] post-processing AI results for tactical map...');
-    return results;
+    
+    // For MVP/Demo: If the model is not actually generating new data (e.g. Identity model), 
+    // or if we just want to visualize the input seed, we can parse the seed directly.
+    // In a real GraphCast scenario, 'results' would contain the NEXT time step.
+    // Here we return the parsed seed data formatted for Mapbox.
+    
+    // Find wind variables
+    const uVar = seed.variables.find(v => v.name === 'u10' || v.name === 'u');
+    const vVar = seed.variables.find(v => v.name === 'v10' || v.name === 'v');
+
+    if (!uVar || !vVar) {
+      console.warn('[Inference] Missing wind variables in seed');
+      return { type: 'FeatureCollection', features: [] };
+    }
+
+    // Use SeedReader helper or manual extraction
+    // We'll extract the first time step for display
+    const latPoints = seed.latitudes.length;
+    const lonPoints = seed.longitudes.length;
+    const timeStep0 = 0;
+
+    // Helper to get value at (t, lat, lon)
+    const getValue = (v: typeof uVar, latIdx: number, lonIdx: number) => {
+       const flatIdx = (timeStep0 * latPoints * lonPoints) + (latIdx * lonPoints) + lonIdx;
+       if (v.data?.quantizedValues?.length) {
+         return v.data.addOffset + (v.data.quantizedValues[flatIdx] * v.data.scaleFactor);
+       }
+       return v.data?.values?.[flatIdx] || 0;
+    };
+
+    const windData = [];
+    for (let i = 0; i < latPoints; i++) {
+      for (let j = 0; j < lonPoints; j++) {
+        windData.push({
+          lat: seed.latitudes[i],
+          lon: seed.longitudes[j],
+          u10: getValue(uVar, i, j),
+          v10: getValue(vVar, i, j),
+          timestamp: new Date(seed.timeStepsIso[timeStep0]).getTime()
+        });
+      }
+    }
+
+    return windDataToGeoJSON(windData);
   }
 }

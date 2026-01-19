@@ -61,6 +61,7 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
     *   `GridSync.ts`: Fleet-wide CC0 synchronization with background fetch support.
     *   **PatternAlert UI:** Tactical display with double-tap haptic feedback for DIVERGENT consensus.
     *   **Feature Flags:** RemoteConfig implemented for "Night Watch" and "Social Reporting" toggles.
+    *   **AI Engine:** GraphCast ONNX model weight loading, tensor binding, and GeoJSON post-processing implemented.
 *   **Integration:**
     *   `SeedUploader.ts` utility for cloud distribution.
     *   `MockNMEAStreamer.ts` utility for "Storm Sim" stress testing.
@@ -71,7 +72,7 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
     *   **Storm Sim Field Test:** ✅ Passed. Successfully triggered DIVERGENT state during simulated pressure plunge.
 
 ### 🚧 **In Progress**
-*   **AI Model Integration:** GraphCast ONNX model weight loading and tensor binding.
+*   **End-to-End Integration:** Wiring Slicer -> Cloud -> Mobile -> Map for live Pacific Crossing data.
 
 ---
 
@@ -88,9 +89,9 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 
 ## 5. Next Immediate Actions (for AI Agents)
 
-1.  **AI Model Integration:** This is the final frontier. Load the ONNX weights and execute inference on the NPU.
-2.  **Liquid Glass Icons:** Generate the iOS assets per `conductor/ICON_SETUP.md`.
-3.  **Submit to TestFlight:** Run `eas build --profile preview --platform ios`.
+1.  **Liquid Glass Icons:** Generate the iOS assets per `conductor/ICON_SETUP.md`.
+2.  **Submit to TestFlight:** Run `eas build --profile preview --platform ios`.
+3.  **Marketing Assets:** Generate screenshots for the App Store.
 
 ---
 
