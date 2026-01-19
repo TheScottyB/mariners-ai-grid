@@ -750,9 +750,9 @@ export class GridSync {
         title: `${severityEmoji} ${data.title}`,
         body: data.message,
         data: {
-          type: 'emergency_broadcast',
-          priority: 'emergency',
           ...data,
+          notificationType: 'emergency_broadcast',
+          priority: 'emergency',
         },
         sound: true,
         priority: Notifications.AndroidNotificationPriority.MAX,

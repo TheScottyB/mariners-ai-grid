@@ -20,7 +20,9 @@ import { AppState, AppStateStatus, Platform, Appearance } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Subscription } from 'expo-modules-core';
+
+// Use the Subscription type from expo-notifications
+type NotificationSubscription = ReturnType<typeof Notifications.addNotificationReceivedListener>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -102,6 +104,8 @@ Notifications.setNotificationHandler({
 
     return {
       shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: isEmergency,
       shouldSetBadge: isEmergency,
       // On iOS, critical alerts bypass Do Not Disturb
@@ -133,8 +137,8 @@ export function useNightWatch(
   const [manualOverride, setManualOverride] = useState<boolean | null>(null);
 
   // Refs for subscriptions
-  const notificationListener = useRef<Subscription | null>(null);
-  const responseListener = useRef<Subscription | null>(null);
+  const notificationListener = useRef<NotificationSubscription | null>(null);
+  const responseListener = useRef<NotificationSubscription | null>(null);
 
   // ─────────────────────────────────────────────────────────────────────────
   // System Theme Detection
@@ -325,10 +329,10 @@ export function useNightWatch(
 
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+        notificationListener.current.remove();
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+        responseListener.current.remove();
       }
     };
   }, []);

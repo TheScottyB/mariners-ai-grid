@@ -10,7 +10,7 @@
  * 4. Caching: LRU eviction of old seeds to manage device storage
  */
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { tableFromIPC } from 'apache-arrow';
 import type { FeatureCollection, Point } from 'geojson';
 
@@ -74,7 +74,7 @@ export class SeedManager {
 
   constructor(config?: Partial<SeedManagerConfig>) {
     this.config = {
-      seedDirectory: `${FileSystem.documentDirectory}seeds/`,
+      seedDirectory: `${FileSystem.documentDirectory ?? ''}seeds/`,
       maxStorageMB: 50,          // Keep up to 50MB of seeds
       defaultExpiryHours: 72,    // 3-day forecast window
       ...config,

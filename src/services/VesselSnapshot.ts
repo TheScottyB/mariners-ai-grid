@@ -15,7 +15,7 @@
  */
 
 import * as Crypto from 'expo-crypto';
-import { documentDirectory, getInfoAsync, makeDirectoryAsync, writeAsStringAsync, readDirectoryAsync, readAsStringAsync } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { TelemetrySnapshot } from './PatternMatcher';
 import { AtmosphericVector } from './VecDB';
@@ -112,7 +112,7 @@ export class VesselSnapshot {
 
   constructor(db: SQLiteDatabase) {
     this.db = db;
-    this.snapshotDir = `${documentDirectory}snapshots/`;
+    this.snapshotDir = `${FileSystem.documentDirectory ?? ''}snapshots/`;
   }
 
   /**
@@ -120,9 +120,9 @@ export class VesselSnapshot {
    */
   async initialize(): Promise<void> {
     // Create snapshots directory
-    const dirInfo = await getInfoAsync(this.snapshotDir);
+    const dirInfo = await FileSystem.getInfoAsync(this.snapshotDir);
     if (!dirInfo.exists) {
-      await makeDirectoryAsync(this.snapshotDir, { intermediates: true });
+      await FileSystem.makeDirectoryAsync(this.snapshotDir, { intermediates: true });
     }
 
     // Create queue table
@@ -333,7 +333,7 @@ export class VesselSnapshot {
    */
   private async saveForLocalLearning(snapshot: DivergenceSnapshot): Promise<void> {
     const filename = `${this.snapshotDir}${snapshot.snapshot_id}.json`;
-    await writeAsStringAsync(filename, JSON.stringify(snapshot, null, 2));
+    await FileSystem.writeAsStringAsync(filename, JSON.stringify(snapshot, null, 2));
   }
 
   /**
@@ -391,12 +391,12 @@ export class VesselSnapshot {
    * Get local snapshots for VecDB re-training.
    */
   async getLocalSnapshots(limit: number = 100): Promise<DivergenceSnapshot[]> {
-    const files = await readDirectoryAsync(this.snapshotDir);
+    const files = await FileSystem.readDirectoryAsync(this.snapshotDir);
     const snapshots: DivergenceSnapshot[] = [];
 
     for (const file of files.slice(0, limit)) {
       if (file.endsWith('.json')) {
-        const content = await readAsStringAsync(`${this.snapshotDir}${file}`);
+        const content = await FileSystem.readAsStringAsync(`${this.snapshotDir}${file}`);
         snapshots.push(JSON.parse(content));
       }
     }

@@ -227,7 +227,7 @@ export class HazardService {
         report.reportedAt,
         report.reporterId,
         report.pressureSnapshot ?? null,
-        report.motionIntensity,
+        report.motionIntensity ?? null,
         report.verified ? 1 : 0,
         report.confidence,
         report.verificationCount,
