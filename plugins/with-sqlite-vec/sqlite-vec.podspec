@@ -15,10 +15,12 @@ Pod::Spec.new do |s|
   s.vendored_libraries = 'vendor/ios/libsqlite_vec.a'
   s.preserve_paths = 'vendor/ios/libsqlite_vec.a'
   
-  # Auto-init helper
-  s.source_files = 'sqlite-vec-auto-init.c'
+  # Auto-init helper - relative to the podspec location
+  s.source_files = '*.c'
 
   # Ensure library is loaded - use static frameworks for proper linking
   s.static_framework = true
   s.library = 'c++'
+  
+  s.dependency 'ExpoSQLite'
 end

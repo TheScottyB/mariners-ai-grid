@@ -74,17 +74,21 @@ export class VecDB {
     if (this.initialized) return true;
 
     try {
-      // Check if sqlite-vec is available
-      const vecCheck = await this.db.getFirstAsync<{ vec_version: string }>(
-        "SELECT vec_version() as vec_version"
-      );
-
-      if (!vecCheck) {
-        console.warn('[VecDB] sqlite-vec extension not loaded');
+      // Check if sqlite-vec is available by trying to create a test vector table
+      // The vec_version() function might not be exposed via prepareAsync
+      try {
+        await this.db.execAsync(`
+          CREATE VIRTUAL TABLE IF NOT EXISTS _vec_test USING vec0(
+            id TEXT PRIMARY KEY,
+            v float[4]
+          );
+          DROP TABLE _vec_test;
+        `);
+        console.log('[VecDB] sqlite-vec extension loaded successfully');
+      } catch (vecError: any) {
+        console.warn('[VecDB] sqlite-vec extension not loaded:', vecError.message);
         return false;
       }
-
-      console.log(`[VecDB] sqlite-vec version: ${vecCheck.vec_version}`);
 
       // Create the atmospheric patterns table with vector column
       await this.db.execAsync(`
