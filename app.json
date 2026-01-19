@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mariners-ai-grid",
+    "name": "Mariner's AI Grid",
     "slug": "mariners-ai-grid",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/app-icon.png",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -13,18 +13,54 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.thescottybe.marinersaigrid",
+      "icon": "./assets/app.icon",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Required to connect to your boat's Signal K server.",
+        "NSLocationWhenInUseUsageDescription": "Required to show your current position on the weather grid.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Required for background weather alerts and route optimization."
+      }
     },
     "android": {
+      "package": "com.thescottybe.marinersaigrid",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "BODY_SENSORS"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-location",
+      "expo-sqlite",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {
+            "compileSdkVersion": 36
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "dd3b8b54-8d49-43b1-bea7-669fd80e10c9"
+      }
     }
   }
 }

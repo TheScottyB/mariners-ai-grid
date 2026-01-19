@@ -1,0 +1,89 @@
+# Mariner's AI Grid - Conductor (Python Backend)
+# SPDX-License-Identifier: Apache-2.0
+# Data: CC0 (Public Domain)
+
+[project]
+name = "mariners-conductor"
+version = "0.1.0"
+description = "Regional weather slicer for offshore marine navigation - ECMWF HRES to compact Seeds"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+authors = [
+    { name = "Mariner's AI Grid Contributors" }
+]
+keywords = ["weather", "marine", "navigation", "ecmwf", "grib", "offline-first"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+
+dependencies = [
+    # GRIB/Weather data processing
+    "eccodes>=2.34.0",           # ECMWF GRIB codec (native)
+    "cfgrib>=0.9.12",            # GRIB to xarray bridge
+    "xarray>=2024.1.0",          # N-dimensional arrays
+    "numpy>=1.26.0",             # Numerical computing
+
+    # ECMWF data access
+    "cdsapi>=0.7.0",             # Copernicus Climate Data Store API
+
+    # Output formats (Seed generation)
+    "pyarrow>=15.0.0",           # Parquet read/write with zstd
+    "protobuf>=5.26.0",          # Protocol Buffers for compact seeds
+
+    # Geospatial utilities
+    "pyproj>=3.6.0",             # Coordinate transformations
+
+    # Compression
+    "zstandard>=0.22.0",         # Zstandard compression
+
+    # CLI & utilities
+    "click>=8.1.0",              # CLI framework
+    "rich>=13.7.0",              # Pretty terminal output
+    "pydantic>=2.6.0",           # Data validation
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.3.0",
+    "mypy>=1.8.0",
+]
+jax = [
+    # JAX for ML inference (GraphCast compatibility)
+    "jax>=0.4.25",
+    "jaxlib>=0.4.25",
+]
+
+[project.scripts]
+mag-slicer = "slicer.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]  # Line length handled separately
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true

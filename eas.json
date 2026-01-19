@@ -1,0 +1,32 @@
+{
+  "cli": {
+    "version": ">= 16.28.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview"
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "beilsco@gmail.com",
+        "ascAppId": "to-be-configured",
+        "appleTeamId": "to-be-configured"
+      },
+      "android": {
+        "serviceAccountKeyPath": "to-be-configured"
+      }
+    }
+  }
+}
