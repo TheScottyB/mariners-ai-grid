@@ -100,7 +100,7 @@ export class TelemetryService {
   /**
    * Start a mock scenario (Winter Storm, etc.)
    */
-  async startMock(scenario: MockScenario) {
+  public startMock(scenario: MockScenario) {
     this.setSource('mock');
     console.log(`[Telemetry] Starting Mock Scenario: ${scenario.name}`);
     

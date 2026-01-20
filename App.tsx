@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState, useRef, useCallback, createContext, useContext } from 'react';
 import { open, DB } from '@op-engineering/op-sqlite';
@@ -18,6 +18,7 @@ import { HazardService } from './src/services/HazardService';
 import { TruthChecker, DivergenceReport } from './src/services/TruthChecker';
 import { DebrisPredictor } from './src/services/DebrisPredictor';
 import { TelemetryService, TelemetrySource } from './src/services/TelemetryService';
+import { DevMenu } from './src/components/DevMenu';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
@@ -55,8 +56,11 @@ export default function App() {
   const [lastDivergence, setLastDivergence] = useState<DivergenceReport | null>(null);
   const [debrisPaths, setDebrisPaths] = useState<FeatureCollection<LineString> | undefined>(undefined);
   const [telemetrySource, setTelemetrySource] = useState<TelemetrySource>('device');
+  const [devMenuVisible, setDevMenuVisible] = useState(false);
 
   const skBridge = useRef(new SignalKBridge());
+  const headerTapCount = useRef(0);
+  const headerTapTimer = useRef<NodeJS.Timeout | null>(null);
   const patternMatcherRef = useRef<PatternMatcher | null>(null);
   const vecDbRef = useRef<VecDB | null>(null);
   const vesselSnapshotRef = useRef<VesselSnapshot | null>(null);
@@ -222,6 +226,20 @@ export default function App() {
     setActiveAlerts(prev => prev.filter(a => a.id !== alertId));
   }, []);
 
+  const handleHeaderPress = () => {
+    headerTapCount.current += 1;
+    if (headerTapCount.current === 3) {
+      setDevMenuVisible(true);
+      headerTapCount.current = 0;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    }
+
+    if (headerTapTimer.current) clearTimeout(headerTapTimer.current);
+    headerTapTimer.current = setTimeout(() => {
+      headerTapCount.current = 0;
+    }, 500);
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -243,12 +261,12 @@ export default function App() {
   return (
     <SQLiteContext.Provider value={dbRef.current}>
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+        <TouchableOpacity activeOpacity={1} onPress={handleHeaderPress} style={styles.header}>
           <Text style={styles.title}>MARINER'S AI</Text>
           <View style={styles.identityBadge}>
             <Text style={styles.badgeText}>ID: {identity?.deviceId.slice(0, 8)}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.mapWrapper}>
           <MarinerMap
@@ -282,6 +300,19 @@ export default function App() {
 
         <StatusBar style="light" />
       </SafeAreaView>
+
+      <DevMenu 
+        visible={devMenuVisible}
+        onClose={() => setDevMenuVisible(false)}
+        telemetrySource={telemetrySource}
+        onSourceChange={(src) => {
+          if (telemetryServiceRef.current) {
+            telemetryServiceRef.current.setSource(src);
+            setTelemetrySource(src);
+          }
+        }}
+        vesselLocation={vesselLocation}
+      />
     </SQLiteContext.Provider>
   );
 }
