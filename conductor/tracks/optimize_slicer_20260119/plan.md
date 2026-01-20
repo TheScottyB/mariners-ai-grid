@@ -29,7 +29,7 @@
     - [x] Sub-task: Benchmark output size against the 2.5MB target.
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Quantization & Parquet Export' (Protocol in workflow.md)
 
-## Phase 4: Integration & Pipeline
+## Phase 4: Integration & Pipeline [checkpoint: 62ff40e]
 - [x] Task: Build `SeedBuilder` Orchestrator 40dc057
     - [ ] Sub-task: Implement the main pipeline class connecting Fetch -> Slice -> Prune -> Quantize -> Serialize.
     - [x] Task: Create a CLI entry point cdabfd5
