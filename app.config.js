@@ -36,6 +36,7 @@ export default ({ config }) => {
       bundleIdentifier: getBundleId(),
       icon: "./assets/app.icon",
       infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
         NSLocalNetworkUsageDescription: "Required to connect to your boat's Signal K server.",
         NSLocationWhenInUseUsageDescription: "Required to show your current position on the weather grid.",
         NSLocationAlwaysAndWhenInUseUsageDescription: "Required for background weather alerts and route optimization."
