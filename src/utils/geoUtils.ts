@@ -64,6 +64,30 @@ export function waveDataToGeoJSON(waveData: WaveDataPoint[]): FeatureCollection<
 }
 
 /**
+ * Generate a dense grid of wave data for performance stress testing.
+ * Targets 100+ "Fluttering Arrows" at 120Hz.
+ */
+export function generateStressTestGrid(centerLat: number, centerLon: number): WaveDataPoint[] {
+  const points: WaveDataPoint[] = [];
+  const gridCount = 10; // 10x10 grid = 100 points
+  const spacing = 0.05; // ~3nm spacing
+
+  for (let i = 0; i < gridCount; i++) {
+    for (let j = 0; j < gridCount; j++) {
+      points.push({
+        lat: centerLat + (i - gridCount / 2) * spacing,
+        lon: centerLon + (j - gridCount / 2) * spacing,
+        swh: 2.0 + Math.random() * 3.0, // 2-5m waves
+        mwd: Math.random() * 360,
+        mwp: 8.0 + Math.random() * 4.0,
+        timestamp: Date.now(),
+      });
+    }
+  }
+  return points;
+}
+
+/**
  * Convert marine hazards to GeoJSON FeatureCollection for Mapbox rendering.
  */
 export function hazardsToGeoJSON(hazards: MarineHazard[]): FeatureCollection<Point> {

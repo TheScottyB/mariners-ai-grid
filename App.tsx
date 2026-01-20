@@ -5,7 +5,7 @@ import { useEffect, useState, useRef, useCallback, createContext, useContext } f
 import { open, DB } from '@op-engineering/op-sqlite';
 import { IdentityService, MarinerIdentity } from './src/services/IdentityService';
 import { SignalKBridge } from './src/services/SignalKBridge';
-import { windDataToGeoJSON } from './src/utils/geoUtils';
+import { windDataToGeoJSON, generateStressTestGrid, waveDataToGeoJSON } from './src/utils/geoUtils';
 import MarinerMap, { VesselLocation } from './src/components/MarinerMap';
 import { HazardReportingModal } from './src/components/HazardReportingModal';
 import { PatternAlertStack, ConsensusData } from './src/components/PatternAlert';
@@ -35,6 +35,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [forecastData, setForecastData] = useState<FeatureCollection<Point> | undefined>(undefined);
+  
+  // Stress Test State
+  const [isStressTestActive, setIsStressTestActive] = useState(false);
+  const [stressTestData, setStressTestData] = useState<FeatureCollection<Point> | undefined>(undefined);
   
   // Hazard Reporting State
   const [reportingVisible, setReportingVisible] = useState(false);
@@ -81,6 +85,21 @@ export default function App() {
   useEffect(() => {
     activeSeedRef.current = seedManager.activeSeed;
   }, [seedManager.activeSeed]);
+
+  // Stress Test Effect
+  useEffect(() => {
+    if (!isStressTestActive) {
+      setStressTestData(undefined);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const grid = generateStressTestGrid(vesselLocation.lat, vesselLocation.lng);
+      setStressTestData(waveDataToGeoJSON(grid));
+    }, 100); // 10Hz update rate for stress test
+
+    return () => clearInterval(interval);
+  }, [isStressTestActive, vesselLocation.lat, vesselLocation.lng]);
 
   const initializeServices = useCallback(async () => {
     let driftInterval: NodeJS.Timeout | null = null;
@@ -272,7 +291,7 @@ export default function App() {
           <MarinerMap
             vesselLocation={vesselLocation}
             forecastData={seedManager.windGeoJSON || forecastData}
-            waveData={seedManager.waveGeoJSON || undefined}
+            waveData={stressTestData || seedManager.waveGeoJSON || undefined}
             debrisPaths={debrisPaths}
             onReportHazard={(loc) => {
               setReportLocation(loc);
@@ -312,6 +331,8 @@ export default function App() {
           }
         }}
         vesselLocation={vesselLocation}
+        isStressTestActive={isStressTestActive}
+        onToggleStressTest={setIsStressTestActive}
       />
     </SQLiteContext.Provider>
   );

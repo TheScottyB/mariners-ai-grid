@@ -11,6 +11,8 @@ interface DevMenuProps {
   telemetrySource: TelemetrySource;
   onSourceChange: (source: TelemetrySource) => void;
   vesselLocation: { lat: number; lng: number };
+  isStressTestActive: boolean;
+  onToggleStressTest: (active: boolean) => void;
 }
 
 export const DevMenu: React.FC<DevMenuProps> = ({
@@ -19,6 +21,8 @@ export const DevMenu: React.FC<DevMenuProps> = ({
   telemetrySource,
   onSourceChange,
   vesselLocation,
+  isStressTestActive,
+  onToggleStressTest,
 }) => {
   const [autoFallback, setAutoFallback] = useState(true);
 
@@ -82,6 +86,16 @@ export const DevMenu: React.FC<DevMenuProps> = ({
               <Text style={styles.presetSubtext}>Simulates sensor vs AI mismatch</Text>
             </TouchableOpacity>
 
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>ProMotion 120Hz Stress Test</Text>
+              <Switch 
+                value={isStressTestActive} 
+                onValueChange={onToggleStressTest}
+                trackColor={{ false: '#333', true: '#FFD700' }}
+              />
+            </View>
+            <Text style={styles.inputHint}>Renders 100+ "Fluttering Arrows" to verify tactical fluidity.</Text>
+
             <Text style={styles.sectionTitle}>DIAGNOSTICS</Text>
             <View style={styles.diagBox}>
               <Text style={styles.diagText}>Lat: {vesselLocation.lat.toFixed(4)}</Text>
@@ -115,5 +129,6 @@ const styles = StyleSheet.create({
   presetButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 15 },
   presetSubtext: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 4 },
   diagBox: { backgroundColor: '#000', borderRadius: 12, padding: 15 },
-  diagText: { color: '#00FF00', fontFamily: 'monospace', fontSize: 12, marginBottom: 5 }
+  diagText: { color: '#00FF00', fontFamily: 'monospace', fontSize: 12, marginBottom: 5 },
+  inputHint: { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: -10, marginBottom: 15 }
 });
