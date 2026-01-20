@@ -9,14 +9,14 @@
     - [x] Sub-task: Verify GRIB2 integrity and inspect variable names/metadata.
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Environment & Test Data Setup' (Protocol in workflow.md)
 
-## Phase 2: Core Slicing Logic
+## Phase 2: Core Slicing Logic [checkpoint: 81ae745]
 - [x] Task: Implement Spatial Cropping 775a792
-    - [ ] Sub-task: Write tests for `SpatialSlicer` class (input: global xarray, bbox; output: cropped xarray).
-    - [ ] Sub-task: Implement `SpatialSlicer` with 2.5-degree buffer logic using `xarray`.
+    - [x] Sub-task: Write tests for `SpatialSlicer` class (input: global xarray, bbox; output: cropped xarray).
+    - [x] Sub-task: Implement `SpatialSlicer` with 2.5-degree buffer logic using `xarray`.
 - [x] Task: Implement Variable Pruning 34a0543
-    - [ ] Sub-task: Write tests for `VariablePruner` (input: xarray, list of vars; output: pruned xarray).
-    - [ ] Sub-task: Implement `VariablePruner` to filter for Wind (U/V), Pressure (MSL), and Waves.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Core Slicing Logic' (Protocol in workflow.md)
+    - [x] Sub-task: Write tests for `VariablePruner` (input: xarray, list of vars; output: pruned xarray).
+    - [x] Sub-task: Implement `VariablePruner` to filter for Wind (U/V), Pressure (MSL), and Waves.
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Core Slicing Logic' (Protocol in workflow.md)
 
 ## Phase 3: Quantization & Parquet Export
 - [ ] Task: Implement Quantization Strategy
