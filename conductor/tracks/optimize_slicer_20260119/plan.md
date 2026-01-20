@@ -33,7 +33,7 @@
 - [x] Task: Build `SeedBuilder` Orchestrator 40dc057
     - [ ] Sub-task: Implement the main pipeline class connecting Fetch -> Slice -> Prune -> Quantize -> Serialize.
     - [x] Task: Create a CLI entry point cdabfd5
-- [ ] Task: End-to-End Validation
+- [x] Task: End-to-End Validation 823d62f
     - [ ] Sub-task: Run the pipeline on the sample GRIB2 file.
     - [ ] Sub-task: Verify the output "Seed" can be read back and contains correct data values (fidelity check).
 - [ ] Task: Conductor - User Manual Verification 'Phase 4: Integration & Pipeline' (Protocol in workflow.md)
