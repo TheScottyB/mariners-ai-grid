@@ -4,7 +4,7 @@
 - [x] Task: Set up Python environment and dependencies 1867c83
     - [ ] Sub-task: Verify `uv` setup and `pyproject.toml` dependencies (ensure `xarray`, `pandas`, `pyarrow`/`fastparquet`, `cfgrib` are present).
     - [ ] Sub-task: Create a Docker Compose configuration for the Slicer service (Python 3.12).
-- [ ] Task: Acquire Reference Data
+- [x] Task: Acquire Reference Data c316c77
     - [ ] Sub-task: Create a script to download a sample ECMWF AIFS GRIB2 file (global, single timestep) for testing.
     - [ ] Sub-task: Verify GRIB2 integrity and inspect variable names/metadata.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Environment & Test Data Setup' (Protocol in workflow.md)
