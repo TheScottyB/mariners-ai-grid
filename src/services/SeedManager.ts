@@ -96,6 +96,7 @@ export class SeedManager {
 
     await this.loadMetadataIndex();
     await this.cleanupExpiredSeeds();
+    await this.enforceLRU();
     console.log(`[SeedManager] Initialized with ${this.metadataIndex.length} seeds`);
   }
 
@@ -138,6 +139,7 @@ export class SeedManager {
     };
 
     this.metadataIndex.push(metadata);
+    await this.enforceLRU();
     await this.saveMetadataIndex();
     this.seedCache.set(metadata.id, { metadata, timesteps: parsed.timesteps });
 
@@ -178,6 +180,7 @@ export class SeedManager {
     };
 
     this.metadataIndex.push(metadata);
+    await this.enforceLRU();
     await this.saveMetadataIndex();
     this.seedCache.set(metadata.id, { metadata, timesteps: parsed.timesteps });
 
@@ -366,6 +369,29 @@ export class SeedManager {
       total += meta.fileSizeBytes;
     }
     return total;
+  }
+
+  /**
+   * Enforce Least Recently Used (LRU) eviction if over storage limit.
+   */
+  private async enforceLRU(): Promise<void> {
+    let currentTotal = await this.getStorageUsed();
+    const maxBytes = this.config.maxStorageMB * 1024 * 1024;
+
+    if (currentTotal <= maxBytes) return;
+
+    console.log(`[SeedManager] Storage limit exceeded (${(currentTotal / 1024 / 1024).toFixed(1)}MB / ${this.config.maxStorageMB}MB). Evicting oldest seeds...`);
+
+    // Sort by downloadedAt (oldest first)
+    const sorted = [...this.metadataIndex].sort((a, b) => a.downloadedAt - b.downloadedAt);
+
+    while (currentTotal > maxBytes && sorted.length > 0) {
+      const oldest = sorted.shift();
+      if (oldest) {
+        currentTotal -= oldest.fileSizeBytes;
+        await this.deleteSeed(oldest.id);
+      }
+    }
   }
 
   // Private Helpers
