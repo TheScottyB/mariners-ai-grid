@@ -4,7 +4,7 @@
  * Handles on-the-fly dequantization for satellite-optimized payloads.
  */
 
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { decompress } from 'fzstd';
 import { WeatherSeed, VariableData } from '../schema/schema/weather_seed';
 import { WindDataPoint } from '../utils/geoUtils';
@@ -18,13 +18,17 @@ export class SeedReader {
     try {
       console.log(`[SeedReader] Reading: ${fileUri}`);
       
-      // 1. Read file as Base64 (Expo limitation for binary)
-      const base64Data = await FileSystem.readAsStringAsync(fileUri, {
-        encoding: 'base64',
-      });
+      // Modern API: Use File object
+      // fileUri is likely 'file:///...' from legacy code, convert to path if needed
+      // But File constructor takes path or uri.
+      const file = new File(fileUri);
       
-      // 2. Convert to Uint8Array
-      const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      if (!file.exists) {
+        throw new Error(`Seed file not found: ${fileUri}`);
+      }
+
+      // 1. Read directly as bytes (Uint8Array)
+      const binaryData = await file.bytes();
       
       // 3. Decompress Zstandard
       console.log(`[SeedReader] Decompressing ${binaryData.length} bytes...`);

@@ -8,3 +8,140 @@ Starting project at /Users/scottybe/workspace/mariners-ai-grid
 Starting Metro Bundler
 Waiting on http://localhost:8081
 Logs for your project will appear below.
+iOS ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 611ms index.ts (1385 modules)
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+ LOG  [SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...
+ LOG  [Identity] Existing Shadow ID loaded: dd0f3e9c-edee-48ef-bdc6-df7500beb732
+ LOG  [RemoteConfig] Initializing...
+ LOG  [RemoteConfig] Base flags loaded from app.config.js
+ LOG  [RemoteConfig] Active Flags: {"experimentalSlicer": false, "nightWatch": false, "socialReporting": true}
+ LOG  [App] Initializing op-sqlite (Zero Latency)...
+ LOG  [VecDB] Mariner AI Grid Vector Engine: vv0.1.6
+ LOG  [VecDB] Initialized successfully
+ LOG  [VesselSnapshot] Initialized
+ LOG  [GridSync] Initialized
+ WARN  [GridSync] Failed to register background sync: [Error: Calling the 'registerTaskAsync' function has failed
+→ Caused by: Background Task has not been configured. To enable it, add `process` to `UIBackgroundModes` in the application's Info.plist file]
+ LOG  [Telemetry] Initializing with source: device
+ LOG  Attempting connection to Signal K: ws://localhost:3000/signalk/v1/stream
+ LOG  ⚓ Signal K Bridge Connection Closed
+iOS Bundled 32ms index.ts (1 module)
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+ LOG  [SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...
+ LOG  [Identity] Existing Shadow ID loaded: 80515965-9a3d-47ee-a485-0d53a06331de
+ LOG  [RemoteConfig] Initializing...
+ LOG  [RemoteConfig] Base flags loaded from app.config.js
+ LOG  [RemoteConfig] Active Flags: {"experimentalSlicer": false, "nightWatch": false, "socialReporting": true}
+ LOG  [App] Initializing op-sqlite (Zero Latency)...
+ LOG  [VecDB] Mariner AI Grid Vector Engine: vv0.1.6
+ LOG  [VecDB] Initialized successfully
+ LOG  [VesselSnapshot] Initialized
+ LOG  [GridSync] Initialized
+ WARN  Background tasks are not supported on iOS simulators. Skipped registering task: MARINERS_GRID_SYNC.
+ LOG  [GridSync] Background sync registered
+ LOG  [Telemetry] Initializing with source: device
+ LOG  Attempting connection to Signal K: ws://localhost:3000/signalk/v1/stream
+ LOG  ⚓ Signal K Bridge Connection Closed
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ WARN  [SeedManager] Failed to fetch Home Slice: [Error: Destination already exists]
+ LOG  [SeedManager] Initialized with 0 seeds
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ WARN  [SeedManager] Failed to fetch Home Slice: [Error: Destination already exists]
+ LOG  [SeedManager] Initialized with 0 seeds
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ WARN  Seed download failed: [Error: Destination already exists]
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ WARN  Seed download failed: [Error: Destination already exists]
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ WARN  Seed download failed: [Error: Destination already exists]
+ LOG  [SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...
+ LOG  [SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Reading: file:///Users/scottybe/Library/Developer/CoreSimulator/Devices/AAB54C88-21FE-4FA3-A4A5-27E5F9E3A0DB/data/Containers/Data/Application/7DCCAABC-46FE-49A6-80F8-024CB445C690/Documents/seeds/mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Decompressing 1281992 bytes...
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Decompressed size: 1747953 bytes
+ LOG  [SeedReader] Parsed Seed: mock_a9cafafcfcb1_2026011900 (mock_hres)
+ LOG  [SeedManager] Seed ready: seed_1768876678940_mock_a9cafafcfcb1_20
+ LOG  [SeedManager] Initialized with 1 seeds
+ LOG  [SeedReader] Reading: file:///var/mobile/Containers/Data/Application/264FAA64-9F41-4F9B-A83A-6E35BC45A4BC/Documents/seeds/mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Decompressing 1281992 bytes...
+ LOG  [SeedReader] Decompressed size: 1747953 bytes
+ LOG  [SeedReader] Parsed Seed: mock_a9cafafcfcb1_2026011900 (mock_hres)
+ LOG  [SeedManager] Seed ready: seed_1768876679542_mock_a9cafafcfcb1_20
+ LOG  [SeedManager] Initialized with 1 seeds
+ LOG  [SeedManager] Initialized with 1 seeds
+ LOG  [SeedManager] Initialized with 1 seeds
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Reading: file:///Users/scottybe/Library/Developer/CoreSimulator/Devices/AAB54C88-21FE-4FA3-A4A5-27E5F9E3A0DB/data/Containers/Data/Application/7DCCAABC-46FE-49A6-80F8-024CB445C690/Documents/seeds/mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Decompressing 1281992 bytes...
+ LOG  [SeedReader] Decompressed size: 1747953 bytes
+ LOG  [SeedReader] Parsed Seed: mock_a9cafafcfcb1_2026011900 (mock_hres)
+ LOG  [SeedManager] Seed ready: seed_1768876688376_mock_a9cafafcfcb1_20
+ LOG  [useSeedManager] Selected seed: seed_1768876688376_mock_a9cafafcfcb1_20, timestep: 0
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Reading: file:///Users/scottybe/Library/Developer/CoreSimulator/Devices/AAB54C88-21FE-4FA3-A4A5-27E5F9E3A0DB/data/Containers/Data/Application/7DCCAABC-46FE-49A6-80F8-024CB445C690/Documents/seeds/mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Decompressing 1281992 bytes...
+ LOG  [SeedReader] Decompressed size: 1747953 bytes
+ LOG  [SeedReader] Parsed Seed: mock_a9cafafcfcb1_2026011900 (mock_hres)
+ LOG  [SeedManager] Seed ready: seed_1768876703104_mock_a9cafafcfcb1_20
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Reading: file:///Users/scottybe/Library/Developer/CoreSimulator/Devices/AAB54C88-21FE-4FA3-A4A5-27E5F9E3A0DB/data/Containers/Data/Application/7DCCAABC-46FE-49A6-80F8-024CB445C690/Documents/seeds/mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Decompressing 1281992 bytes...
+ LOG  [SeedReader] Decompressed size: 1747953 bytes
+ LOG  [SeedReader] Parsed Seed: mock_a9cafafcfcb1_2026011900 (mock_hres)
+ LOG  [SeedManager] Seed ready: seed_1768876716806_mock_a9cafafcfcb1_20
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Reading: file:///var/mobile/Containers/Data/Application/264FAA64-9F41-4F9B-A83A-6E35BC45A4BC/Documents/seeds/mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Decompressing 1281992 bytes...
+ LOG  [SeedReader] Decompressed size: 1747953 bytes
+ LOG  [SeedReader] Parsed Seed: mock_a9cafafcfcb1_2026011900 (mock_hres)
+ LOG  [SeedManager] Seed ready: seed_1768876739778_mock_a9cafafcfcb1_20
+ LOG  [useSeedManager] Selected seed: seed_1768876739778_mock_a9cafafcfcb1_20, timestep: 0
+ LOG  [SeedManager] Initialized with 4 seeds
+ LOG  [SeedManager] Initialized with 2 seeds
+ LOG  [SeedManager] Initialized with 4 seeds
+ LOG  [SeedManager] Initialized with 2 seeds
+iOS ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 116ms index.ts (1 module)
+iOS Bundled 90ms index.ts (1 module)
+iOS Bundled 24ms index.ts (1 module)
+iOS Bundled 24ms index.ts (1 module)
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+ LOG  [SeedManager] Initialized with 4 seeds
+ LOG  [Identity] Existing Shadow ID loaded: 80515965-9a3d-47ee-a485-0d53a06331de
+ LOG  [RemoteConfig] Initializing...
+ LOG  [RemoteConfig] Base flags loaded from app.config.js
+ LOG  [RemoteConfig] Active Flags: {"experimentalSlicer": false, "nightWatch": false, "socialReporting": true}
+ LOG  [App] Initializing op-sqlite (Zero Latency)...
+ LOG  [VecDB] Mariner AI Grid Vector Engine: vv0.1.6
+ LOG  [VecDB] Initialized successfully
+ LOG  [VesselSnapshot] Initialized
+ LOG  [GridSync] Initialized
+ WARN  Background tasks are not supported on iOS simulators. Skipped registering task: MARINERS_GRID_SYNC.
+ LOG  [GridSync] Background sync registered
+ LOG  [Telemetry] Initializing with source: device
+ LOG  Attempting connection to Signal K: ws://localhost:3000/signalk/v1/stream
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+ LOG  [SeedManager] Initialized with 2 seeds
+ LOG  [Identity] Existing Shadow ID loaded: dd0f3e9c-edee-48ef-bdc6-df7500beb732
+ LOG  [RemoteConfig] Initializing...
+ LOG  [RemoteConfig] Base flags loaded from app.config.js
+ LOG  [RemoteConfig] Active Flags: {"experimentalSlicer": false, "nightWatch": false, "socialReporting": true}
+ LOG  [App] Initializing op-sqlite (Zero Latency)...
+ LOG  [VecDB] Mariner AI Grid Vector Engine: vv0.1.6
+ LOG  [VecDB] Initialized successfully
+ LOG  [VesselSnapshot] Initialized
+ LOG  [GridSync] Initialized
+ WARN  [GridSync] Failed to register background sync: [Error: Calling the 'registerTaskAsync' function has failed
+→ Caused by: Background Task has not been configured. To enable it, add `process` to `UIBackgroundModes` in the application's Info.plist file]
+ LOG  [Telemetry] Initializing with source: device
+ LOG  Attempting connection to Signal K: ws://localhost:3000/signalk/v1/stream
+ LOG  [SeedManager] Downloading seed: mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Reading: file:///var/mobile/Containers/Data/Application/264FAA64-9F41-4F9B-A83A-6E35BC45A4BC/Documents/seeds/mock_a9cafafcfcb1_2026011900.seed.zst
+ LOG  [SeedReader] Decompressing 1281992 bytes...
+ LOG  [SeedReader] Decompressed size: 1747953 bytes
+ LOG  [SeedReader] Parsed Seed: mock_a9cafafcfcb1_2026011900 (mock_hres)
+ LOG  [SeedManager] Seed ready: seed_1768877553125_mock_a9cafafcfcb1_20
+ LOG  [useSeedManager] Selected seed: seed_1768877553125_mock_a9cafafcfcb1_20, timestep: 0

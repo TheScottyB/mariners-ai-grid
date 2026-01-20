@@ -53,8 +53,26 @@ const mockFileSystem = {
   deleteAsync: vi.fn(),
   makeDirectoryAsync: vi.fn(),
   copyAsync: vi.fn(),
-  FileSystemFile: class {},
-  FileSystemDirectory: class {},
+  FileSystemFile: class {
+    constructor(path) { this.uri = path; }
+    exists = true;
+    delete = vi.fn();
+    write = vi.fn();
+    text = vi.fn().mockResolvedValue('[]');
+    bytes = vi.fn().mockResolvedValue(new Uint8Array());
+    copy = vi.fn();
+    static downloadFileAsync = vi.fn();
+  },
+  FileSystemDirectory: class {
+    constructor(path) { this.uri = path; }
+    exists = true;
+    create = vi.fn();
+    delete = vi.fn();
+  },
+  Paths: {
+    document: 'file:///data/user/0/com.mariners.grid/files/',
+    cache: 'file:///data/user/0/com.mariners.grid/cache/',
+  }
 };
 
 (globalThis as any).expo = {
@@ -64,6 +82,18 @@ const mockFileSystem = {
     FileSystem: mockFileSystem,
   }
 };
+
+// Also mock the direct export for tests that import from expo-file-system
+vi.mock('expo-file-system', () => {
+  return {
+    Paths: {
+      document: 'file:///mock/document/',
+      cache: 'file:///mock/cache/',
+    },
+    File: mockFileSystem.FileSystemFile,
+    Directory: mockFileSystem.FileSystemDirectory,
+  };
+});
 
 // 4. Mock expo-constants
 vi.mock('expo-constants', () => ({

@@ -270,7 +270,7 @@ export default function App() {
     try {
       // For MVP Explorer Mode, we fetch the static Pacific/McHenry starter seed
       await seedManager.downloadSeed(
-        'https://mariners-ai-grid.s3.amazonaws.com/seeds/pacific_starter_v1.parquet'
+        'http://192.168.12.172:8082/mock_a9cafafcfcb1_2026011900.seed.zst'
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Seed Downloaded", "New weather data is active.");

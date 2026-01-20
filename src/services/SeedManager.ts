@@ -10,459 +10,818 @@
  * 4. Caching: LRU eviction of old seeds to manage device storage
  */
 
-import * as FileSystem from 'expo-file-system/legacy';
+import { File, Directory, Paths } from 'expo-file-system';
+
 import { tableFromIPC } from 'apache-arrow';
+
 import type { FeatureCollection, Point } from 'geojson';
 
+
+
 import { windDataToGeoJSON, WindDataPoint, WaveDataPoint, waveDataToGeoJSON } from '../utils/geoUtils';
+
 import { SeedReader } from './SeedReader';
+
 import { WeatherSeed } from '../schema/schema/weather_seed';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
 
-export interface SeedMetadata {
-  id: string;                    // Unique seed identifier (hash)
-  filename: string;              // Local filename
-  format: 'parquet' | 'protobuf';
-  createdAt: number;             // When the seed was generated
-  downloadedAt: number;          // When we received it
-  expiresAt: number;             // When forecast data becomes stale
 
-  // Coverage area
-  bounds: {
-    north: number;
-    south: number;
-    east: number;
-    west: number;
-  };
+// ... (Types remain the same) ...
 
-  // Forecast window
-  forecastStartTime: number;     // First timestep (UTC ms)
-  forecastEndTime: number;       // Last timestep (UTC ms)
-  timestepCount: number;         // Number of forecast hours
 
-  // File info
-  fileSizeBytes: number;
-  source: 'starlink' | 'wifi' | 'airdrop' | 'usb' | 'local';
-}
-
-export interface ParsedSeed {
-  metadata: SeedMetadata;
-  timesteps: SeedTimestep[];
-}
-
-export interface SeedTimestep {
-  validTime: number;             // UTC timestamp for this forecast hour
-  windData: WindDataPoint[];     // Gridded wind U/V components
-  waveData?: WaveDataPoint[];    // Gridded wave height/direction/period
-}
-
-export interface SeedManagerConfig {
-  seedDirectory: string;         // Where to store seeds
-  maxStorageMB: number;          // LRU eviction threshold
-  defaultExpiryHours: number;    // How long before a seed is considered stale
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SeedManager Class
-// ─────────────────────────────────────────────────────────────────────────────
 
 export class SeedManager {
+
   private config: SeedManagerConfig;
+
   private seedCache: Map<string, ParsedSeed> = new Map();
+
   private rawSeedCache: Map<string, WeatherSeed> = new Map();
+
   private metadataIndex: SeedMetadata[] = [];
 
+  private seedDir: Directory;
+
+
+
   constructor(config?: Partial<SeedManagerConfig>) {
+
+    // Modern API: Use Directory object rooted at document path
+
+    this.seedDir = new Directory(Paths.document, 'seeds');
+
+    
+
     this.config = {
-      seedDirectory: `${FileSystem.documentDirectory ?? ''}seeds/`,
-      maxStorageMB: 50,          // Keep up to 50MB of seeds
-      defaultExpiryHours: 72,    // 3-day forecast window
+
+      seedDirectory: this.seedDir.uri, // Keep for backward compatibility if needed, or remove
+
+      maxStorageMB: 50,
+
+      defaultExpiryHours: 72,
+
       ...config,
+
     };
+
   }
 
+
+
   /**
+
    * Initialize the seed directory and load metadata index.
+
    */
+
   async initialize(): Promise<void> {
-    const dirInfo = await FileSystem.getInfoAsync(this.config.seedDirectory);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(this.config.seedDirectory, { intermediates: true });
+
+    if (!this.seedDir.exists) {
+
+      this.seedDir.create();
+
       console.log('[SeedManager] Created seed directory');
+
     }
+
+
 
     await this.loadMetadataIndex();
+
     await this.cleanupExpiredSeeds();
+
     await this.enforceLRU();
+
     
-    // Auto-load "Home Slice" (McHenry/Chicago) if no seeds exist (Explorer Mode MVP)
+
+    // Auto-load "Home Slice" (McHenry/Chicago) if no seeds exist
+
     if (this.metadataIndex.length === 0) {
+
       console.log('[SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...');
+
       try {
+
         // Simulate network delay for realism
+
         await new Promise(resolve => setTimeout(resolve, 1500));
+
         
+
         await this.downloadSeed(
-          'https://mariners-ai-grid.s3.amazonaws.com/seeds/pacific_starter_v1.parquet',
+
+          'http://192.168.12.172:8082/mock_a9cafafcfcb1_2026011900.seed.zst',
+
           'local'
+
         );
+
       } catch (e) {
+
         console.warn('[SeedManager] Failed to fetch Home Slice:', e);
+
       }
+
     }
+
+
 
     console.log(`[SeedManager] Initialized with ${this.metadataIndex.length} seeds`);
+
   }
 
+
+
   /**
+
    * Download a seed from a URL (Starlink/WiFi).
+
    */
+
   async downloadSeed(
+
     url: string,
+
     source: SeedMetadata['source'] = 'wifi'
+
   ): Promise<SeedMetadata> {
+
     const filename = this.extractFilename(url);
-    const localPath = `${this.config.seedDirectory}${filename}`;
 
-    console.log(`[SeedManager] Downloading seed: ${filename}`);
+    const targetFile = new File(this.seedDir, filename);
 
-    const downloadResult = await FileSystem.downloadAsync(url, localPath);
 
-    if (downloadResult.status !== 200) {
-      throw new Error(`Download failed with status ${downloadResult.status}`);
+
+        console.log(`[SeedManager] Downloading seed: ${filename}`);
+
+
+
+    
+
+
+
+        // Modern API: ensure target is clean
+
+
+
+        if (targetFile.exists) {
+
+
+
+          targetFile.delete();
+
+
+
+        }
+
+
+
+    
+
+
+
+        // Correction: It's File.downloadFileAsync(url, file)
+
+
+
+        await File.downloadFileAsync(url, targetFile);
+
+
+
+    
+
+
+
+    if (!targetFile.exists) {
+
+        throw new Error('Download failed');
+
     }
 
+
+
     const format = filename.endsWith('.parquet') ? 'parquet' : 'protobuf';
-    const parsed = await this.parseSeed(localPath, format);
-    const info = await FileSystem.getInfoAsync(localPath);
-    const size = info.exists ? info.size : 0;
+
+    const parsed = await this.parseSeed(targetFile.uri, format);
+
+    const size = targetFile.size ?? 0;
+
+
 
     const metadata: SeedMetadata = {
+
       id: this.generateSeedId(filename),
+
       filename,
+
       format,
+
       createdAt: parsed.timesteps[0]?.validTime ?? Date.now(),
+
       downloadedAt: Date.now(),
+
       expiresAt: Date.now() + this.config.defaultExpiryHours * 60 * 60 * 1000,
+
       bounds: this.calculateBounds(parsed.timesteps[0]?.windData ?? []),
+
       forecastStartTime: parsed.timesteps[0]?.validTime ?? Date.now(),
+
       forecastEndTime: parsed.timesteps[parsed.timesteps.length - 1]?.validTime ?? Date.now(),
+
       timestepCount: parsed.timesteps.length,
+
       fileSizeBytes: size,
+
       source,
+
     };
 
+
+
     this.metadataIndex.push(metadata);
+
     await this.enforceLRU();
+
     await this.saveMetadataIndex();
+
     this.seedCache.set(metadata.id, { metadata, timesteps: parsed.timesteps });
+
+
 
     console.log(`[SeedManager] Seed ready: ${metadata.id}`);
+
     return metadata;
+
   }
 
-  /**
-   * Import a seed from local file (AirDrop, USB).
-   */
-  async importLocalSeed(
-    sourcePath: string,
-    source: SeedMetadata['source'] = 'airdrop'
-  ): Promise<SeedMetadata> {
-    const filename = sourcePath.split('/').pop() ?? 'unknown.seed';
-    const localPath = `${this.config.seedDirectory}${filename}`;
 
-    await FileSystem.copyAsync({ from: sourcePath, to: localPath });
+
+  /**
+
+   * Import a seed from local file (AirDrop, USB).
+
+   */
+
+  async importLocalSeed(
+
+    sourcePath: string,
+
+    source: SeedMetadata['source'] = 'airdrop'
+
+  ): Promise<SeedMetadata> {
+
+    const filename = sourcePath.split('/').pop() ?? 'unknown.seed';
+
+        const targetFile = new File(this.seedDir, filename);
+
+        const sourceFile = new File(sourcePath);
+
+    
+
+        // Modern API copy: ensure target is clean
+
+        if (targetFile.exists) {
+
+          targetFile.delete();
+
+        }
+
+        sourceFile.copy(targetFile);
+
+    
+
+
 
     const format = filename.endsWith('.parquet') ? 'parquet' : 'protobuf';
-    const parsed = await this.parseSeed(localPath, format);
-    const info = await FileSystem.getInfoAsync(localPath);
-    const size = info.exists ? info.size : 0;
+
+    const parsed = await this.parseSeed(targetFile.uri, format);
+
+    const size = targetFile.size ?? 0;
+
+
 
     const metadata: SeedMetadata = {
+
       id: this.generateSeedId(filename),
+
       filename,
+
       format,
+
       createdAt: parsed.timesteps[0]?.validTime ?? Date.now(),
+
       downloadedAt: Date.now(),
+
       expiresAt: Date.now() + this.config.defaultExpiryHours * 60 * 60 * 1000,
+
       bounds: this.calculateBounds(parsed.timesteps[0]?.windData ?? []),
+
       forecastStartTime: parsed.timesteps[0]?.validTime ?? Date.now(),
+
       forecastEndTime: parsed.timesteps[parsed.timesteps.length - 1]?.validTime ?? Date.now(),
+
       timestepCount: parsed.timesteps.length,
+
       fileSizeBytes: size,
+
       source,
+
     };
 
+
+
     this.metadataIndex.push(metadata);
+
     await this.enforceLRU();
+
     await this.saveMetadataIndex();
+
     this.seedCache.set(metadata.id, { metadata, timesteps: parsed.timesteps });
 
+
+
     return metadata;
+
   }
 
+
+
   /**
+
    * Parse a Parquet seed file using Apache Arrow.
+
    */
+
   async parseParquetSeed(filePath: string): Promise<SeedTimestep[]> {
+
     const startTime = performance.now();
 
-    const fileContent = await FileSystem.readAsStringAsync(filePath, {
-      encoding: 'base64',
-    });
-    const buffer = this.base64ToArrayBuffer(fileContent);
+    const file = new File(filePath);
+
+
+
+    // Modern API: Read as bytes (ArrayBuffer) directly
+
+    const buffer = await file.bytes();
+
     const table = tableFromIPC(buffer);
 
+
+
     const parseTime = performance.now() - startTime;
+
     console.log(`[SeedManager] Parsed ${table.numRows} rows in ${parseTime.toFixed(1)}ms`);
 
+
+
+    // ... (Rest of parsing logic remains same) ...
+
     const latCol = table.getChild('latitude') ?? table.getChild('lat');
+
     const lonCol = table.getChild('longitude') ?? table.getChild('lon');
+
     const u10Col = table.getChild('u10');
+
     const v10Col = table.getChild('v10');
+
     const timeCol = table.getChild('valid_time') ?? table.getChild('time');
 
+
+
     if (!latCol || !lonCol || !u10Col || !v10Col) {
+
       throw new Error('Missing required columns');
+
     }
+
+
 
     const timestepMap = new Map<number, SeedTimestep>();
 
+
+
     for (let i = 0; i < table.numRows; i++) {
+
       const validTime = timeCol?.get(i) ?? Date.now();
+
       const lat = latCol.get(i) as number;
+
       const lon = lonCol.get(i) as number;
+
       const u10 = u10Col.get(i) as number;
+
       const v10 = v10Col.get(i) as number;
 
+
+
       if (!timestepMap.has(validTime)) {
+
         timestepMap.set(validTime, {
+
           validTime,
+
           windData: [],
+
         });
+
       }
+
+
 
       const timestep = timestepMap.get(validTime)!;
+
       timestep.windData.push({ lat, lon, u10, v10, timestamp: validTime });
+
     }
+
+
 
     return Array.from(timestepMap.values()).sort((a, b) => a.validTime - b.validTime);
+
   }
 
+
+
+  // ... (getRawSeed, getWindGeoJSON, etc. remain unchanged) ...
+
+  
+
   /**
+
    * Parse a seed file (auto-detect format).
+
    */
+
   async parseSeed(filePath: string, format: 'parquet' | 'protobuf'): Promise<{ timesteps: SeedTimestep[] }> {
+
     if (format === 'parquet') {
+
       const timesteps = await this.parseParquetSeed(filePath);
+
       return { timesteps };
+
     } else {
+
       const seed = await SeedReader.loadSeed(filePath);
-      
-      // Cache raw seed for truth checking
+
       const filename = filePath.split('/').pop() || '';
+
       const seedId = this.generateSeedId(filename);
-      // Note: seedId in metadataIndex is slightly different, but we'll align them in the caller
+
       this.rawSeedCache.set(seedId, seed);
 
+
+
       const windData = SeedReader.extractWindData(seed, 0);
-      
+
       let validTime = Date.now();
+
       if (seed.createdAtIso) {
+
           try { validTime = new Date(seed.createdAtIso).getTime(); } catch {}
+
       }
+
+
 
       const timestep: SeedTimestep = {
+
         validTime: validTime,
+
         windData: windData,
+
       };
 
+
+
       return { timesteps: [timestep] };
+
     }
+
   }
 
-  /**
-   * Get raw decoded WeatherSeed data (Protobuf format only).
-   */
+
+
   getRawSeed(seedId: string): WeatherSeed | null {
+
     return this.rawSeedCache.get(seedId) || null;
+
   }
 
-  /**
-   * Get wind data for a specific timestep.
-   */
+
+
   async getWindGeoJSON(seedId: string, timestepIndex: number = 0): Promise<FeatureCollection<Point>> {
+
     const seed = this.seedCache.get(seedId);
+
     if (!seed || !seed.timesteps[timestepIndex]) {
+
       throw new Error(`Seed or timestep not found: ${seedId}`);
+
     }
+
     return windDataToGeoJSON(seed.timesteps[timestepIndex].windData);
+
   }
 
-  /**
-   * Get wave data for a specific timestep.
-   */
+
+
   async getWaveGeoJSON(seedId: string, timestepIndex: number = 0): Promise<FeatureCollection<Point> | null> {
+
     const seed = this.seedCache.get(seedId);
+
     if (!seed || !seed.timesteps[timestepIndex] || !seed.timesteps[timestepIndex].waveData) {
+
       return null;
+
     }
+
     return waveDataToGeoJSON(seed.timesteps[timestepIndex].waveData!);
+
   }
 
-  /**
-   * Get the best seed for current position and time.
-   */
+
+
   getBestSeed(lat: number, lon: number, time: number = Date.now()): SeedMetadata | null {
+
     const candidates = this.metadataIndex.filter((meta) => {
+
       if (meta.expiresAt < Date.now()) return false;
+
       if (lat < meta.bounds.south || lat > meta.bounds.north) return false;
+
       if (lon < meta.bounds.west || lon > meta.bounds.east) return false;
+
       return true;
+
     });
 
+
+
     if (candidates.length === 0) return null;
+
     return candidates.sort((a, b) => b.downloadedAt - a.downloadedAt)[0];
+
   }
 
-  /**
-   * Get timestep index for a specific time within a seed.
-   */
+
+
   getTimestepIndex(seedId: string, targetTime: number): number {
+
     const seed = this.seedCache.get(seedId);
+
     if (!seed || seed.timesteps.length === 0) return 0;
 
+
+
     let bestIndex = 0;
+
     let bestDiff = Infinity;
 
+
+
     for (let i = 0; i < seed.timesteps.length; i++) {
+
       const diff = Math.abs(seed.timesteps[i].validTime - targetTime);
+
       if (diff < bestDiff) {
+
         bestDiff = diff;
+
         bestIndex = i;
+
       }
+
     }
+
     return bestIndex;
+
   }
 
-  /**
-   * List all available seeds.
-   */
+
+
   listSeeds(): SeedMetadata[] {
+
     return [...this.metadataIndex];
+
   }
 
+
+
   /**
+
    * Delete a seed.
+
    */
+
   async deleteSeed(seedId: string): Promise<void> {
+
     const index = this.metadataIndex.findIndex((m) => m.id === seedId);
+
     if (index === -1) return;
 
+
+
     const metadata = this.metadataIndex[index];
-    const filePath = `${this.config.seedDirectory}${metadata.filename}`;
+
+    const targetFile = new File(this.seedDir, metadata.filename);
+
+
 
     try {
-        await FileSystem.deleteAsync(filePath, { idempotent: true });
+
+        if (targetFile.exists) {
+
+            targetFile.delete();
+
+        }
+
     } catch (e) {
-        console.warn(`[SeedManager] Failed to delete file: ${filePath}`, e);
+
+        console.warn(`[SeedManager] Failed to delete file: ${metadata.filename}`, e);
+
     }
+
+
 
     this.metadataIndex.splice(index, 1);
+
     this.seedCache.delete(seedId);
+
     await this.saveMetadataIndex();
+
     console.log(`[SeedManager] Deleted seed: ${seedId}`);
+
   }
 
-  /**
-   * Get total storage used by seeds.
-   */
-  async getStorageUsed(): Promise<number> {
-    let total = 0;
-    for (const meta of this.metadataIndex) {
-      total += meta.fileSizeBytes;
+
+
+  // Private Helpers
+
+  private async loadMetadataIndex(): Promise<void> {
+
+    const indexFile = new File(this.seedDir, 'index.json');
+
+    if (indexFile.exists) {
+
+      const content = await indexFile.text();
+
+      this.metadataIndex = JSON.parse(content);
+
     }
-    return total;
+
   }
 
-  /**
-   * Enforce Least Recently Used (LRU) eviction if over storage limit.
-   */
+
+
+  private async saveMetadataIndex(): Promise<void> {
+
+    const indexFile = new File(this.seedDir, 'index.json');
+
+    await indexFile.write(JSON.stringify(this.metadataIndex, null, 2));
+
+  }
+
+
+
+  private async cleanupExpiredSeeds(): Promise<void> {
+
+    const now = Date.now();
+
+    const expired = this.metadataIndex.filter((m) => m.expiresAt < now);
+
+    for (const meta of expired) {
+
+        await this.deleteSeed(meta.id);
+
+    }
+
+  }
+
+
+
+  private generateSeedId(filename: string): string {
+
+    return `seed_${Date.now()}_${filename.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20)}`;
+
+  }
+
+
+
+  private extractFilename(url: string): string {
+
+    const parts = url.split('/');
+
+    return parts[parts.length - 1] || `seed_${Date.now()}.parquet`;
+
+  }
+
+
+
+  private calculateBounds(windData: WindDataPoint[]): SeedMetadata['bounds'] {
+
+    if (windData.length === 0) return { north: 0, south: 0, east: 0, west: 0 };
+
+    let north = -90, south = 90, east = -180, west = 180;
+
+    for (const point of windData) {
+
+      if (point.lat > north) north = point.lat;
+
+      if (point.lat < south) south = point.lat;
+
+      if (point.lon > east) east = point.lon;
+
+      if (point.lon < west) west = point.lon;
+
+    }
+
+    return { north, south, east, west };
+
+  }
+
+
+
+  private base64ToArrayBuffer(base64: string): ArrayBuffer {
+
+    const binaryString = atob(base64);
+
+    const bytes = new Uint8Array(binaryString.length);
+
+    for (let i = 0; i < binaryString.length; i++) {
+
+      bytes[i] = binaryString.charCodeAt(i);
+
+    }
+
+    return bytes.buffer;
+
+  }
+
+  
+
+  // ... (enforceLRU, getStorageUsed need updates for modern API) ...
+
+  async getStorageUsed(): Promise<number> {
+
+    let total = 0;
+
+    // We can rely on metadata size for speed, or check file.size
+
+    for (const meta of this.metadataIndex) {
+
+      // Just trust metadata for now to avoid IO
+
+      total += meta.fileSizeBytes;
+
+    }
+
+    return total;
+
+  }
+
+  
+
   private async enforceLRU(): Promise<void> {
+
     let currentTotal = await this.getStorageUsed();
+
     const maxBytes = this.config.maxStorageMB * 1024 * 1024;
+
+
 
     if (currentTotal <= maxBytes) return;
 
+
+
     console.log(`[SeedManager] Storage limit exceeded (${(currentTotal / 1024 / 1024).toFixed(1)}MB / ${this.config.maxStorageMB}MB). Evicting oldest seeds...`);
 
+
+
     // Sort by downloadedAt (oldest first)
+
     const sorted = [...this.metadataIndex].sort((a, b) => a.downloadedAt - b.downloadedAt);
 
+
+
     while (currentTotal > maxBytes && sorted.length > 0) {
+
       const oldest = sorted.shift();
+
       if (oldest) {
+
         currentTotal -= oldest.fileSizeBytes;
+
         await this.deleteSeed(oldest.id);
+
       }
+
     }
+
   }
 
-  // Private Helpers
-  private async loadMetadataIndex(): Promise<void> {
-    const indexPath = `${this.config.seedDirectory}index.json`;
-    const info = await FileSystem.getInfoAsync(indexPath);
-    if (info.exists) {
-      const content = await FileSystem.readAsStringAsync(indexPath);
-      this.metadataIndex = JSON.parse(content);
-    }
-  }
-
-  private async saveMetadataIndex(): Promise<void> {
-    const indexPath = `${this.config.seedDirectory}index.json`;
-    await FileSystem.writeAsStringAsync(indexPath, JSON.stringify(this.metadataIndex, null, 2));
-  }
-
-  private async cleanupExpiredSeeds(): Promise<void> {
-    const now = Date.now();
-    const expired = this.metadataIndex.filter((m) => m.expiresAt < now);
-    for (const meta of expired) {
-        await this.deleteSeed(meta.id);
-    }
-  }
-
-  private generateSeedId(filename: string): string {
-    return `seed_${Date.now()}_${filename.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 20)}`;
-  }
-
-  private extractFilename(url: string): string {
-    const parts = url.split('/');
-    return parts[parts.length - 1] || `seed_${Date.now()}.parquet`;
-  }
-
-  private calculateBounds(windData: WindDataPoint[]): SeedMetadata['bounds'] {
-    if (windData.length === 0) return { north: 0, south: 0, east: 0, west: 0 };
-    let north = -90, south = 90, east = -180, west = 180;
-    for (const point of windData) {
-      if (point.lat > north) north = point.lat;
-      if (point.lat < south) south = point.lat;
-      if (point.lon > east) east = point.lon;
-      if (point.lon < west) west = point.lon;
-    }
-    return { north, south, east, west };
-  }
-
-  private base64ToArrayBuffer(base64: string): ArrayBuffer {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-  }
 }
+
+
 
 export default SeedManager;

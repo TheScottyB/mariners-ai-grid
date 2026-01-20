@@ -40,13 +40,6 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import * as SecureStore from 'expo-secure-store';
 import { Paths, Directory, File } from 'expo-file-system';
-import {
-  documentDirectory,
-  getInfoAsync,
-  makeDirectoryAsync,
-  createDownloadResumable,
-  type DownloadProgressData,
-} from 'expo-file-system/legacy';
 import * as Network from 'expo-network';
 import Constants from 'expo-constants';
 
@@ -65,7 +58,7 @@ const SIGNAL_K_URL_KEY = 'signal_k_server_url';
 const MARINERS_CODE_ENABLED_KEY = 'mariners_code_enabled';
 
 // Default Pacific Starter seed URL (replace with your actual hosted seed)
-const DEFAULT_SEED_URL = 'https://mariners-ai-grid.s3.amazonaws.com/seeds/pacific_starter_v1.parquet';
+const DEFAULT_SEED_URL = 'http://192.168.12.172:8082/mock_a9cafafcfcb1_2026011900.seed.zst';
 
 // EAS Analytics events (would integrate with your analytics service)
 const ANALYTICS_EVENTS = {
@@ -188,7 +181,7 @@ interface DownloadProgress {
 }
 
 class ResumableDownloadManager {
-  private downloadResumable: ReturnType<typeof createDownloadResumable> | null = null;
+  // private downloadResumable: ReturnType<typeof createDownloadResumable> | null = null;
   private resumeDataKey: string;
 
   constructor(seedId: string) {
@@ -200,68 +193,40 @@ class ResumableDownloadManager {
     localPath: string,
     onProgress: (progress: DownloadProgress) => void
   ): Promise<string> {
-    // Check for existing resume data
-    const resumeDataStr = await SecureStore.getItemAsync(this.resumeDataKey);
+    // Note: Resumable downloads are not yet fully supported in the new File System API.
+    // For now, we perform a standard download.
+    // In the future, we can implement streaming with expo/fetch for progress and resume.
 
-    const progressCallback = (downloadProgress: DownloadProgressData) => {
-      const percentage = downloadProgress.totalBytesExpectedToWrite > 0
-        ? (downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite) * 100
-        : 0;
-
-      onProgress({
-        totalBytesWritten: downloadProgress.totalBytesWritten,
-        totalBytesExpectedToWrite: downloadProgress.totalBytesExpectedToWrite,
-        percentage,
-      });
-    };
-
-    if (resumeDataStr) {
-      console.log('[Download] Resuming interrupted download...');
-      const resumeData = JSON.parse(resumeDataStr);
-      // For resumable downloads, we need to create a new one with the resume data
-      this.downloadResumable = createDownloadResumable(
-        url,
-        localPath,
-        {},
-        progressCallback,
-        resumeData
-      );
-    } else {
-      this.downloadResumable = createDownloadResumable(
-        url,
-        localPath,
-        {},
-        progressCallback
-      );
+    const targetFile = new File(localPath);
+    if (targetFile.exists) {
+        targetFile.delete();
     }
 
+    // Simulate start progress
+    onProgress({
+        totalBytesWritten: 0,
+        totalBytesExpectedToWrite: 0,
+        percentage: 0,
+    });
+
     try {
-      const result = await this.downloadResumable.downloadAsync();
-      // Clear resume data on success
-      await SecureStore.deleteItemAsync(this.resumeDataKey);
+      await File.downloadFileAsync(url, targetFile);
+      
+      // Complete progress
+      onProgress({
+        totalBytesWritten: targetFile.size ?? 0,
+        totalBytesExpectedToWrite: targetFile.size ?? 0,
+        percentage: 100,
+      });
 
-      if (!result?.uri) {
-        throw new Error('Download returned no URI');
-      }
-
-      return result.uri;
+      return targetFile.uri;
     } catch (error) {
-      // Save resume data for future recovery
-      if (this.downloadResumable) {
-        const pauseResult = await this.downloadResumable.pauseAsync();
-        await SecureStore.setItemAsync(
-          this.resumeDataKey,
-          JSON.stringify(pauseResult.resumeData)
-        );
-      }
       throw error;
     }
   }
 
   async cancel() {
-    if (this.downloadResumable) {
-      await this.downloadResumable.pauseAsync();
-    }
+    // Cancellation not implemented for simple downloadFileAsync yet
   }
 }
 
@@ -862,12 +827,12 @@ export const FirstWatchOnboarding: React.FC<FirstWatchOnboardingProps> = ({
       // Use resumable download manager
       downloadManagerRef.current = new ResumableDownloadManager('pacific_starter');
 
-      const localPath = `${documentDirectory}seeds/pacific_starter_v1.parquet`;
+      const localPath = new File(new Directory(Paths.document, 'seeds'), 'pacific_starter_v1.parquet').uri;
 
       // Ensure directory exists
-      const dirInfo = await getInfoAsync(`${documentDirectory}seeds/`);
-      if (!dirInfo.exists) {
-        await makeDirectoryAsync(`${documentDirectory}seeds/`, { intermediates: true });
+      const seedsDir = new Directory(Paths.document, 'seeds');
+      if (!seedsDir.exists) {
+        seedsDir.create();
       }
 
       await downloadManagerRef.current.startOrResume(

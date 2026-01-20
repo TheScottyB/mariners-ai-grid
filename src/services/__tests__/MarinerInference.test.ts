@@ -20,7 +20,7 @@ vi.mock('onnxruntime-react-native', () => ({
   }
 }));
 
-vi.mock('expo-file-system/next', () => {
+vi.mock('expo-file-system', () => {
   return {
     File: class {
       constructor(path: string) {}

@@ -1,6 +1,6 @@
 import * as ort from 'onnxruntime-react-native';
 // @ts-ignore - Using 2026 Next-gen File System
-import { File } from 'expo-file-system/next';
+import { File } from 'expo-file-system';
 import { Buffer } from 'buffer';
 import { WeatherSeed } from '../schema/schema/weather_seed';
 import { windDataToGeoJSON, WaveDataPoint, waveDataToGeoJSON } from '../utils/geoUtils';

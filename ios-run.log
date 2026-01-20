@@ -202,3 +202,66 @@ iOS Bundled 33ms index.ts (1 module)
  LOG  [SeedManager] Downloading seed: pacific_starter_v1.parquet
  WARN  [SeedManager] Failed to fetch Home Slice: [Error: Download failed with status 404]
  LOG  [SeedManager] Initialized with 0 seeds
+ LOG  [SeedManager] Downloading seed: pacific_starter_v1.parquet
+ WARN  Seed download failed: [Error: Download failed with status 404]
+iOS ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 27ms index.ts (1 module)
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+ LOG  [SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...
+ LOG  [Identity] Existing Shadow ID loaded: dd0f3e9c-edee-48ef-bdc6-df7500beb732
+ LOG  [RemoteConfig] Initializing...
+ LOG  [RemoteConfig] Base flags loaded from app.config.js
+ LOG  [RemoteConfig] Active Flags: {"experimentalSlicer": false, "nightWatch": false, "socialReporting": true}
+ LOG  [App] Initializing op-sqlite (Zero Latency)...
+ LOG  [VecDB] Mariner AI Grid Vector Engine: vv0.1.6
+ LOG  [VecDB] Initialized successfully
+ LOG  [VesselSnapshot] Initialized
+ LOG  [GridSync] Initialized
+ WARN  [GridSync] Failed to register background sync: [Error: Calling the 'registerTaskAsync' function has failed
+→ Caused by: Background Task has not been configured. To enable it, add `process` to `UIBackgroundModes` in the application's Info.plist file]
+ LOG  [Telemetry] Initializing with source: device
+ LOG  Attempting connection to Signal K: ws://localhost:3000/signalk/v1/stream
+ LOG  ⚓ Signal K Bridge Connection Closed
+ LOG  [SeedManager] Downloading seed: pacific_starter_v1.parquet
+ WARN  [SeedManager] Failed to fetch Home Slice: [Error: Download failed with status 404]
+ LOG  [SeedManager] Initialized with 0 seeds
+ LOG  [SeedManager] Downloading seed: pacific_starter_v1.parquet
+ WARN  Seed download failed: [Error: Download failed with status 404]
+iOS ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 25ms index.ts (1 module)
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+ LOG  [SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...
+ LOG  [Identity] New Shadow ID generated: 80515965-9a3d-47ee-a485-0d53a06331de
+ LOG  [Analytics] onboarding_started 
+ LOG  [SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...
+ LOG  [SeedManager] Downloading seed: pacific_starter_v1.parquet
+ LOG  [SeedManager] Downloading seed: pacific_starter_v1.parquet
+ WARN  [SeedManager] Failed to fetch Home Slice: [Error: Download failed with status 404]
+ LOG  [SeedManager] Initialized with 0 seeds
+ WARN  [SeedManager] Failed to fetch Home Slice: [Error: Download failed with status 404]
+ LOG  [SeedManager] Initialized with 0 seeds
+ LOG  Attempting connection to Signal K: ws://signalk.local:3000/signalk/v1/stream
+ LOG  ⚓ Signal K Bridge Connection Closed
+ LOG  [Analytics] bridge_failed {"error": "Connection timeout"}
+ LOG  ⚓ Signal K Bridge Connection Closed
+ LOG  [Analytics] onboarding_complete {"bridgeStatus": "failed", "codeStatus": "pending", "seedStatus": "pending", "totalTime": 15562, "verifyStatus": "pending"}
+ LOG  ⚓ First Watch Complete - Analytics Triggered
+ LOG  [RemoteConfig] Initializing...
+ LOG  [RemoteConfig] Base flags loaded from app.config.js
+ LOG  [RemoteConfig] Active Flags: {"experimentalSlicer": false, "nightWatch": false, "socialReporting": true}
+ LOG  [App] Initializing op-sqlite (Zero Latency)...
+ LOG  [VecDB] Mariner AI Grid Vector Engine: vv0.1.6
+ LOG  [VecDB] Initialized successfully
+ LOG  Hazard fetch skipped: [Error: [op-sqlite] sqlite query error: no such table: marine_hazards]
+ LOG  [VesselSnapshot] Initialized
+ LOG  [GridSync] Initialized
+ WARN  Background tasks are not supported on iOS simulators. Skipped registering task: MARINERS_GRID_SYNC.
+ LOG  [GridSync] Background sync registered
+ LOG  [Telemetry] Initializing with source: device
+ LOG  Attempting connection to Signal K: ws://signalk.local:3000/signalk/v1/stream
+ LOG  [SeedManager] Downloading seed: pacific_starter_v1.parquet
+ WARN  Seed download failed: [Error: Download failed with status 404]
+ LOG  [SeedManager] Downloading seed: pacific_starter_v1.parquet
+ WARN  Seed download failed: [Error: Download failed with status 404]
+ LOG  [SeedManager] Downloading seed: pacific_starter_v1.parquet
+ WARN  Seed download failed: [Error: Download failed with status 404]

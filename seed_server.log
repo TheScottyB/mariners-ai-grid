@@ -1,0 +1,2 @@
+127.0.0.1 - - [19/Jan/2026 20:27:20] code 404, message File not found
+127.0.0.1 - - [19/Jan/2026 20:27:20] "HEAD /mock_a9cafafcfcb1_2026011900.parquet HTTP/1.1" 404 -

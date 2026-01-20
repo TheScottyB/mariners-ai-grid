@@ -15,7 +15,7 @@
  */
 
 import * as Crypto from 'expo-crypto';
-import * as FileSystem from 'expo-file-system/legacy';
+import { File, Directory, Paths } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { DB } from '@op-engineering/op-sqlite';
 import { TelemetrySnapshot } from './PatternMatcher';
@@ -108,12 +108,12 @@ export interface SnapshotQueueItem {
 
 export class VesselSnapshot {
   private db: DB;
-  private snapshotDir: string;
+  private snapshotDir: Directory;
   private appVersion: string = '0.1.0';
 
   constructor(db: DB) {
     this.db = db;
-    this.snapshotDir = `${FileSystem.documentDirectory ?? ''}snapshots/`;
+    this.snapshotDir = new Directory(Paths.document, 'snapshots');
   }
 
   /**
@@ -121,9 +121,8 @@ export class VesselSnapshot {
    */
   async initialize(): Promise<void> {
     // Create snapshots directory
-    const dirInfo = await FileSystem.getInfoAsync(this.snapshotDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(this.snapshotDir, { intermediates: true });
+    if (!this.snapshotDir.exists) {
+      this.snapshotDir.create();
     }
 
     // Create queue table
@@ -258,8 +257,8 @@ export class VesselSnapshot {
   }
 
   private async saveForLocalLearning(snapshot: DivergenceSnapshot): Promise<void> {
-    const filename = `${this.snapshotDir}${snapshot.snapshot_id}.json`;
-    await FileSystem.writeAsStringAsync(filename, JSON.stringify(snapshot, null, 2));
+    const file = new File(this.snapshotDir, `${snapshot.snapshot_id}.json`);
+    file.write(JSON.stringify(snapshot, null, 2));
   }
 
   async getPendingSnapshots(limit: number = 10): Promise<SnapshotQueueItem[]> {
@@ -295,12 +294,18 @@ export class VesselSnapshot {
   }
 
   async getLocalSnapshots(limit: number = 100): Promise<DivergenceSnapshot[]> {
-    const files = await FileSystem.readDirectoryAsync(this.snapshotDir);
+    const items = this.snapshotDir.list();
     const snapshots: DivergenceSnapshot[] = [];
-    for (const file of files.slice(0, limit)) {
-      if (file.endsWith('.json')) {
-        const content = await FileSystem.readAsStringAsync(`${this.snapshotDir}${file}`);
+    
+    // Filter for files ending in .json
+    const jsonFiles = items.filter(item => item instanceof File && item.name.endsWith('.json')) as File[];
+    
+    for (const file of jsonFiles.slice(0, limit)) {
+      try {
+        const content = file.textSync();
         snapshots.push(JSON.parse(content));
+      } catch (e) {
+        console.warn(`[VesselSnapshot] Failed to parse snapshot: ${file.name}`, e);
       }
     }
     return snapshots;

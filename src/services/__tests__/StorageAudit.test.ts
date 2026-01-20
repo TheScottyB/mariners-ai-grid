@@ -10,17 +10,44 @@ vi.mock('@op-engineering/op-sqlite', () => ({
   })),
 }));
 
-// Mock expo-file-system/legacy
-vi.mock('expo-file-system/legacy', () => ({
-  documentDirectory: 'test://',
-  getInfoAsync: vi.fn().mockResolvedValue({ exists: true }),
-  makeDirectoryAsync: vi.fn().mockResolvedValue(undefined),
-  deleteAsync: vi.fn().mockResolvedValue(undefined),
-  writeAsStringAsync: vi.fn().mockResolvedValue(undefined),
-  readAsStringAsync: vi.fn().mockResolvedValue('[]'),
-  downloadAsync: vi.fn(),
-  copyAsync: vi.fn(),
-}));
+// Mock expo-file-system
+vi.mock('expo-file-system', () => {
+  class FileMock {
+    uri: string;
+    exists: boolean = true;
+    size: number = 0;
+    
+    constructor(path: string) {
+      this.uri = typeof path === 'string' ? path : path.uri || 'test://';
+    }
+    
+    delete = vi.fn();
+    write = vi.fn();
+    text = vi.fn().mockResolvedValue('[]');
+    bytes = vi.fn();
+    copy = vi.fn();
+    
+    static downloadFileAsync = vi.fn().mockResolvedValue({ uri: 'test', exists: true });
+  }
+
+  class DirectoryMock {
+    uri: string;
+    exists: boolean = true;
+    
+    constructor(...args: any[]) {
+      this.uri = args.join('/');
+    }
+    
+    create = vi.fn();
+    list = vi.fn().mockReturnValue([]);
+  }
+
+  return {
+    File: FileMock,
+    Directory: DirectoryMock,
+    Paths: { document: 'test://', cache: 'test://cache/' }
+  };
+});
 
 describe('Space Reclamation Audit (LRU Eviction)', () => {
   let manager: SeedManager;
