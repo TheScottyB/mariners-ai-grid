@@ -4,7 +4,6 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [x] **Track: Mobile App Parquet Integration**
-  *Link: [./tracks/mobile_app_parquet_integration_20260120/](./tracks/mobile_app_parquet_integration_20260120/)*
+
 
 
