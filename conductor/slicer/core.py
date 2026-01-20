@@ -20,6 +20,7 @@ import logging
 import tempfile
 
 import numpy as np
+import xarray as xr
 
 logger = logging.getLogger(__name__)
 
@@ -620,3 +621,56 @@ class ECMWFHRESSlicer:
                 "variable_count": len(variables),
             },
         )
+
+
+class SpatialSlicer:
+    """
+    Handles geographical cropping of weather datasets.
+
+    Ensures consistent application of spatial buffers and handles
+    coordinate system specifics (e.g. descending latitude in GRIB).
+    """
+
+    def __init__(self, buffer_deg: float = 2.5):
+        self.buffer_deg = buffer_deg
+
+    def slice(self, ds: xr.Dataset, bbox: BoundingBox) -> xr.Dataset:
+        """
+        Crop an xarray Dataset to a bounding box with buffer.
+
+        Args:
+            ds: Input dataset with 'latitude' and 'longitude' coordinates.
+            bbox: Target bounding box.
+
+        Returns:
+            Cropped xarray Dataset.
+        """
+        if bbox.lat_min >= bbox.lat_max:
+            raise ValueError(f"Invalid latitude range: {bbox.lat_min} to {bbox.lat_max}")
+
+        # Apply buffer
+        lat_min = max(-90, bbox.lat_min - self.buffer_deg)
+        lat_max = min(90, bbox.lat_max + self.buffer_deg)
+        lon_min = bbox.lon_min - self.buffer_deg
+        lon_max = bbox.lon_max + self.buffer_deg
+
+        # Handle coordinate orientation
+        # GRIB/ECMWF typically uses descending latitude (90 -> -90)
+        is_lat_descending = bool(ds.latitude[0] > ds.latitude[-1])
+
+        lat_slice = (
+            slice(lat_max, lat_min) if is_lat_descending else slice(lat_min, lat_max)
+        )
+        lon_slice = slice(lon_min, lon_max)
+
+        # Handle longitude wrapping (AIFS/HRES is usually 0-360)
+        # For now, simple slice. TODO: Robust wrapping for dateline crossings.
+
+        ds_cropped = ds.sel(latitude=lat_slice, longitude=lon_slice)
+
+        if ds_cropped.latitude.size == 0 or ds_cropped.longitude.size == 0:
+            # Fallback if selection returned nothing (e.g. coordinate mismatch)
+            logger.warning(f"Spatial slice returned empty dataset for bbox {bbox}")
+
+        return ds_cropped
+                                    
