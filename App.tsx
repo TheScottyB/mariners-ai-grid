@@ -25,10 +25,7 @@ import * as Haptics from 'expo-haptics';
 import type { FeatureCollection, Point, LineString } from 'geojson';
 
 import { RemoteConfig } from './src/services/RemoteConfig';
-
-// Compatibility context for components using useSQLiteContext
-export const SQLiteContext = createContext<DB | null>(null);
-export const useSQLiteContext = () => useContext(SQLiteContext);
+import { SQLiteContext, useSQLiteContext } from './src/context/SQLiteContext';
 
 export default function App() {
   const [identity, setIdentity] = useState<MarinerIdentity | null>(null);

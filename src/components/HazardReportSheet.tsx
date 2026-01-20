@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
-import { useSQLiteContext } from '../../App';
+import { useSQLiteContext } from '../context/SQLiteContext';
 
 import { HazardService, HazardType } from '../services/HazardService';
 import { IdentityService } from '../services/IdentityService';

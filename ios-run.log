@@ -1,0 +1,17 @@
+
+> mariners-ai-grid@1.0.0 ios /Users/scottybe/workspace/mariners-ai-grid
+> expo run:ios -- --device 'iPhone 16'
+
+env: load .env
+env: export EXPO_PUBLIC_MAPBOX_TOKEN RNMAPBOX_MAPS_DOWNLOAD_TOKEN
+› Skipping dev server
+Unexpected devicectl JSON version output from devicectl. Connecting to physical Apple devices may not work as expected.
+› Using --device 9F57A5D6-AEAB-4E6B-9BC8-5DE32BE267B7
+› Searching builds with matching fingerprint on EAS servers
+› Successfully downloaded cached build
+Using custom binary path: /var/folders/b7/pfwxwwj52b904b30bk0tyyv80000gn/T/eas-cli-nodejs/eas-build-run-cache/dd3b8b54-8d49-43b1-bea7-669fd80e10c9_10097115-dc41-455a-a945-1cb39a6ff458.app
+Waiting on http://localhost:8081
+› Installing /var/folders/b7/pfwxwwj52b904b30bk0tyyv80000gn/T/eas-cli-nodejs/eas-build-run-cache/dd3b8b54-8d49-43b1-bea7-669fd80e10c9_10097115-dc41-455a-a945-1cb39a6ff458.app
+› Installing on iPhone 16
+› Opening on iPhone 16 (com.thescottybe.marinersaigrid)
+› Opening com.thescottybe.marinersaigrid://expo-development-client/?url=http%3A%2F%2F192.168.12.172%3A8081 on iPhone 16

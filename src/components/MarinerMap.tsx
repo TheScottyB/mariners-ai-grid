@@ -20,7 +20,7 @@ import Mapbox, {
   UserLocation,
   Images,
 } from '@rnmapbox/maps';
-import { useSQLiteContext } from '../../App';
+import { useSQLiteContext } from '../context/SQLiteContext';
 import type { FeatureCollection, Point, LineString } from 'geojson';
 
 import {
