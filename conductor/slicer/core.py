@@ -673,4 +673,43 @@ class SpatialSlicer:
             logger.warning(f"Spatial slice returned empty dataset for bbox {bbox}")
 
         return ds_cropped
+
+
+class SeedBuilder:
+    """
+    Orchestrates the Fetch -> Slice -> Prune -> Quantize -> Serialize pipeline.
+    """
+
+    def __init__(self, cache_dir: Optional[Path] = None, output_dir: Optional[Path] = None):
+        self.cache_dir = cache_dir or Path(tempfile.gettempdir()) / "mag_cache"
+        self.output_dir = output_dir or Path.cwd() / "output"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def build_seed(
+        self,
+        lat: float,
+        lon: float,
+        radius_nm: float = 500,
+        forecast_hours: int = 72,
+        variable_set: str = "standard",
+    ) -> Path:
+        """
+        Run the full pipeline to generate a Parquet seed.
+        """
+        from slicer.aifs import AIFSSlicer
+        from slicer.export import SeedExporter
+
+        # 1. Define BBox
+        bbox = BoundingBox.from_center(lat, lon, radius_nm)
+
+        # 2. Slice (includes Fetch and Spatial Buffer)
+        slicer = AIFSSlicer(cache_dir=self.cache_dir)
+        seed = slicer.slice(bbox, forecast_hours=forecast_hours, variable_set=variable_set)
+
+        # 3. Export (includes Pruning and Quantization)
+        exporter = SeedExporter(output_dir=self.output_dir)
+        output_path, stats = exporter.to_parquet(seed)
+
+        logger.info(f"Seed built successfully: {output_path}")
+        return output_path
                                     

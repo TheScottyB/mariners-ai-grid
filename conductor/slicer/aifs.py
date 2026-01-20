@@ -49,6 +49,7 @@ class AIFSSlicer:
         bbox: BoundingBox,
         forecast_hours: int = 72,
         time_step_hours: int = 6, # AIFS standard step
+        variable_set: str = "marine",
     ) -> WeatherSeed:
         """
         Generate a Seed for local GraphCast inference.
@@ -69,7 +70,7 @@ class AIFSSlicer:
         
         # 3. Fetch Data with Fallback
         # ECMWF Open Data Advantage: Fetch native 0.25 deg (28km) resolution
-        pruner = VariablePruner("marine")
+        pruner = VariablePruner(variable_set)
         sfc_params = pruner.get_ecmwf_params("sfc")
         pl_params = pruner.get_ecmwf_params("pl")
         levels = [1000, 850, 500, 200] 
