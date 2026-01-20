@@ -13,7 +13,7 @@
 - [x] Task: Implement Spatial Cropping 775a792
     - [ ] Sub-task: Write tests for `SpatialSlicer` class (input: global xarray, bbox; output: cropped xarray).
     - [ ] Sub-task: Implement `SpatialSlicer` with 2.5-degree buffer logic using `xarray`.
-- [ ] Task: Implement Variable Pruning
+- [x] Task: Implement Variable Pruning 34a0543
     - [ ] Sub-task: Write tests for `VariablePruner` (input: xarray, list of vars; output: pruned xarray).
     - [ ] Sub-task: Implement `VariablePruner` to filter for Wind (U/V), Pressure (MSL), and Waves.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Core Slicing Logic' (Protocol in workflow.md)
