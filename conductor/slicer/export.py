@@ -97,7 +97,7 @@ class SeedExporter:
         import pyarrow as pa
         import pyarrow.parquet as pq
 
-        from slicer.variables import MARINE_VARIABLES, VariablePruner
+        from slicer.quantization_config import quantize_array
         from slicer.cost_model import SatelliteCostModel
 
         if filename is None:
@@ -126,7 +126,6 @@ class SeedExporter:
         }
 
         # Add variable columns
-        pruner = VariablePruner("full")
         input_bytes = 0
 
         for var_name, arr in seed.variables.items():
@@ -134,9 +133,8 @@ class SeedExporter:
             flat = arr.flatten()
 
             # Apply quantization if requested
-            if quantize and var_name in MARINE_VARIABLES:
-                var_def = MARINE_VARIABLES[var_name]
-                flat = pruner.quantize_array(flat, var_def)
+            if quantize:
+                flat = quantize_array(flat, var_name)
 
             columns[var_name] = flat
 
