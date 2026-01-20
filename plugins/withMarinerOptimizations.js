@@ -51,12 +51,14 @@ const withMarinerOptimizations = (config) => {
 
           # Force ARM NEON and Fast Math for vector distance calculations
           # -ffast-math: ~20-40% speedup, safe for similarity search
-          config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
-          config.build_settings['OTHER_CFLAGS'] << '-ffast-math'
-
-          # AMX optimization hints for M-series chips
-          config.build_settings['OTHER_CFLAGS'] << '-DSQLITE_VEC_ENABLE_NEON=1'
-          config.build_settings['OTHER_CFLAGS'] << '-DSQLITE_VEC_ENABLE_AMX=1'
+          if config.build_settings['OTHER_CFLAGS'].is_a?(String)
+            config.build_settings['OTHER_CFLAGS'] += ' -ffast-math -DSQLITE_VEC_ENABLE_NEON=1 -DSQLITE_VEC_ENABLE_AMX=1'
+          else
+            config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
+            config.build_settings['OTHER_CFLAGS'] << '-ffast-math'
+            config.build_settings['OTHER_CFLAGS'] << '-DSQLITE_VEC_ENABLE_NEON=1'
+            config.build_settings['OTHER_CFLAGS'] << '-DSQLITE_VEC_ENABLE_AMX=1'
+          end
         end
       end
     end

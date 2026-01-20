@@ -34,7 +34,7 @@ export default ({ config }) => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: getBundleId(),
-      icon: "./assets/app.icon",
+      icon: "./assets/app-icon.png",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSLocalNetworkUsageDescription: "Required to connect to your boat's Signal K server.",
