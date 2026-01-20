@@ -76,7 +76,7 @@ describe('MarinerInference', () => {
     const result = await inference.runForecast('file://seed.zst');
     
     expect(result).toBeDefined();
-    // geoUtils mock returns empty FC
-    expect(result.type).toBe('FeatureCollection');
+    // @ts-ignore - check wind part of multi-modal result
+    expect(result.wind.type).toBe('FeatureCollection');
   });
 });

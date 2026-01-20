@@ -253,10 +253,10 @@ export class HazardService {
     );
 
     // Also update virtual table for vector search
-    await this.db.execute(`DELETE FROM marine_hazards_vec WHERE id = ?`, [report.id]);
+    await this.db.execute(`DELETE FROM marine_hazards_vec WHERE id = ?`, [report.id as string]);
     await this.db.execute(
       `INSERT INTO marine_hazards_vec (id, location) VALUES (?, vec_f32(?))`,
-      [report.id, locationVec]
+      [report.id as string, locationVec]
     );
 
     console.log(`⚓ Mariner's Code: ${type} report logged (confidence: ${confidence.toFixed(2)})`);
@@ -264,9 +264,81 @@ export class HazardService {
   }
 
   /**
-   * Get hazards near a location using high-performance vector range queries.
-   * Leverages sqlite-vec v0.2.x range constraints.
+   * Validate sensor data against expected ranges for hazard type.
    */
+  private validateSensorData(type: HazardType, sensors: SensorSnapshot): boolean {
+    if (type === 'squall' && sensors.pressure !== null) {
+      // Squall should correlate with low pressure
+      return sensors.pressure <= (WEATHER_PRESSURE_THRESHOLDS.squall.max);
+    }
+
+    if (type === 'surge') {
+      // High motion intensity validates surge report
+      return sensors.motionIntensity > 0.3;
+    }
+
+    // For other types, just having sensor data increases trust
+    return sensors.pressure !== null || sensors.motionIntensity > 0;
+  }
+
+  /**
+   * Verify an existing hazard (called when another boat confirms it).
+   */
+  async verifyHazard(hazardId: string): Promise<void> {
+    await this.db.execute(
+      `UPDATE marine_hazards
+       SET verification_count = verification_count + 1,
+           confidence = MIN(1.0, confidence + 0.15),
+           verified = CASE WHEN verification_count >= 1 THEN 1 ELSE verified END
+       WHERE id = ?`,
+      [hazardId]
+    );
+  }
+
+  /**
+   * Apply drift to floating hazards based on current data.
+   * Called periodically with surface current vectors.
+   */
+  async applyDrift(
+    surfaceCurrentU: number, // m/s eastward
+    surfaceCurrentV: number, // m/s northward
+    hoursElapsed: number
+  ): Promise<number> {
+    const driftingTypes: HazardType[] = ['debris', 'whale', 'fishing_gear'];
+    const now = Date.now();
+
+    const result = await this.db.execute(
+      `SELECT id, lat, lon FROM marine_hazards
+       WHERE type IN (${driftingTypes.map(() => '?').join(',')})
+       AND expires_at > ?`,
+      [...driftingTypes, now]
+    );
+
+    const hazards = result.rows || [];
+    let updatedCount = 0;
+
+    for (const hazard of hazards) {
+      const lat = hazard.lat as number;
+      const lon = hazard.lon as number;
+      const metersPerDegLat = 111000;
+      const metersPerDegLon = 111000 * Math.cos((lat * Math.PI) / 180);
+
+      const driftMetersE = surfaceCurrentU * hoursElapsed * 3600;
+      const driftMetersN = surfaceCurrentV * hoursElapsed * 3600;
+
+      const newLon = lon + driftMetersE / metersPerDegLon;
+      const newLat = lat + driftMetersN / metersPerDegLat;
+
+      await this.db.execute(
+        `UPDATE marine_hazards SET lat = ?, lon = ?, last_drift_update = ? WHERE id = ?`,
+        [newLat, newLon, now, hazard.id]
+      );
+      updatedCount++;
+    }
+
+    return updatedCount;
+  }
+
   async getHazardsNear(
     lat: number,
     lon: number,

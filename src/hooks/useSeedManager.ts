@@ -43,6 +43,7 @@ export interface UseSeedManagerResult {
 
   // Actions
   selectSeed: (seedId: string) => Promise<void>;
+  getRawSeed: (seedId: string) => any;
   setTimestep: (index: number) => void;
   nextTimestep: () => void;
   prevTimestep: () => void;
@@ -299,6 +300,7 @@ export function useSeedManager(options: UseSeedManagerOptions = {}): UseSeedMana
     availableSeeds,
     storageUsedMB,
     selectSeed,
+    getRawSeed: (seedId: string) => managerRef.current?.getRawSeed(seedId) || null,
     setTimestep,
     nextTimestep,
     prevTimestep,

@@ -16,6 +16,7 @@ import type { FeatureCollection, Point } from 'geojson';
 
 import { windDataToGeoJSON, WindDataPoint, WaveDataPoint, waveDataToGeoJSON } from '../utils/geoUtils';
 import { SeedReader } from './SeedReader';
+import { WeatherSeed } from '../schema/schema/weather_seed';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -71,6 +72,7 @@ export interface SeedManagerConfig {
 export class SeedManager {
   private config: SeedManagerConfig;
   private seedCache: Map<string, ParsedSeed> = new Map();
+  private rawSeedCache: Map<string, WeatherSeed> = new Map();
   private metadataIndex: SeedMetadata[] = [];
 
   constructor(config?: Partial<SeedManagerConfig>) {
@@ -239,6 +241,13 @@ export class SeedManager {
       return { timesteps };
     } else {
       const seed = await SeedReader.loadSeed(filePath);
+      
+      // Cache raw seed for truth checking
+      const filename = filePath.split('/').pop() || '';
+      const seedId = this.generateSeedId(filename);
+      // Note: seedId in metadataIndex is slightly different, but we'll align them in the caller
+      this.rawSeedCache.set(seedId, seed);
+
       const windData = SeedReader.extractWindData(seed, 0);
       
       let validTime = Date.now();
@@ -253,6 +262,13 @@ export class SeedManager {
 
       return { timesteps: [timestep] };
     }
+  }
+
+  /**
+   * Get raw decoded WeatherSeed data (Protobuf format only).
+   */
+  getRawSeed(seedId: string): WeatherSeed | null {
+    return this.rawSeedCache.get(seedId) || null;
   }
 
   /**

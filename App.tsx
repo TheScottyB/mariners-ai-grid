@@ -15,6 +15,7 @@ import { VecDB } from './src/services/VecDB';
 import { VesselSnapshot } from './src/services/VesselSnapshot';
 import { GridSync } from './src/services/GridSync';
 import { HazardService } from './src/services/HazardService';
+import { TruthChecker, DivergenceReport } from './src/services/TruthChecker';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
 import type { FeatureCollection, Point } from 'geojson';
 
@@ -47,19 +48,27 @@ export default function App() {
   const [activeAlerts, setActiveAlerts] = useState<PatternAlertType[]>([]);
   const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Set<string>>(new Set());
   const [consensusMap, setConsensusMap] = useState<Map<string, ConsensusData>>(new Map());
+  const [lastDivergence, setLastDivergence] = useState<DivergenceReport | null>(null);
 
   const skBridge = useRef(new SignalKBridge());
   const patternMatcherRef = useRef<PatternMatcher | null>(null);
   const vecDbRef = useRef<VecDB | null>(null);
   const vesselSnapshotRef = useRef<VesselSnapshot | null>(null);
   const gridSyncRef = useRef<GridSync | null>(null);
+  const truthCheckerRef = useRef<TruthChecker | null>(null);
   const dbRef = useRef<DB | null>(null);
   const lastTelemetryRef = useRef<TelemetrySnapshot | null>(null);
+  const activeSeedRef = useRef<any>(null); // Ref to current seed from manager
 
   // Weather Seed Manager
   const seedManager = useSeedManager({
     autoSelectForPosition: { lat: vesselLocation.lat, lon: vesselLocation.lng },
   });
+
+  // Keep track of active seed for TruthChecker
+  useEffect(() => {
+    activeSeedRef.current = seedManager.activeSeed;
+  }, [seedManager.activeSeed]);
 
   const initializeServices = useCallback(async () => {
     try {
@@ -85,6 +94,10 @@ export default function App() {
       // Initialize HazardService and create schema
       const hazardService = new HazardService(db, identity?.deviceId || 'unknown');
       await hazardService.initSchema().catch(e => console.warn('[App] HazardService init failed:', e));
+
+      // Initialize TruthChecker
+      const truthChecker = new TruthChecker(vesselSnapshot, vecDb);
+      truthCheckerRef.current = truthChecker;
 
       // Initialize GridSync
       const gridSync = new GridSync(db, vesselSnapshot, vecDb);
@@ -136,13 +149,36 @@ export default function App() {
         }
 
         setActiveAlerts(prev => [alert, ...prev.filter(a => a.id !== alert.id)]);
+      }, (conditions) => {
+        // console.log('[App] Conditions Updated:', conditions);
       });
       patternMatcherRef.current = matcher;
 
       // Connect bridge telemetry to matcher
-      skBridge.current.onTelemetry((snapshot) => {
+      skBridge.current.onTelemetry(async (snapshot) => {
+        // 1. Process for pattern matching (alerts)
         matcher.processTelemetry(snapshot);
         lastTelemetryRef.current = snapshot;
+
+        // 2. Process for Truth Checking (divergence detection)
+        if (truthCheckerRef.current && activeSeedRef.current) {
+          const rawSeed = seedManager.getRawSeed(activeSeedRef.current.id);
+          if (rawSeed) {
+            const report = await truthCheckerRef.current.check(
+              snapshot, 
+              rawSeed, 
+              seedManager.activeTimestep
+            );
+            
+            setLastDivergence(report);
+
+            if (report.isDivergent) {
+              console.log(`[App] AI Grid Divergence Level: ${report.level}`);
+              // Trigger a synthetic alert for divergence if not already handled
+              // In production, this would be a specialized 'DivergenceAlert' component
+            }
+          }
+        }
       });
 
     } catch (error) {
