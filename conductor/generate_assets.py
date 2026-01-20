@@ -195,9 +195,99 @@ def generate_favicon():
     img.save(filename)
     print(f"Generated: {filename}")
 
+def generate_liquid_glass_icon():
+    size = 1024
+    layer_dir = os.path.join(ASSETS_DIR, "app.icon", "layers")
+    ensure_dir(layer_dir)
+    
+    # 1. Background Layer (Gradient + Grid)
+    bg = create_gradient(size, size, PALETTE['mid_ocean'], PALETTE['deep_ocean'])
+    bg_draw = ImageDraw.Draw(bg, 'RGBA')
+    step = size // 8
+    for i in range(1, 8):
+        bg_draw.line([(i * step, 0), (i * step, size)], fill=(255, 255, 255, 10), width=2)
+        bg_draw.line([(0, i * step), (size, i * step)], fill=(255, 255, 255, 10), width=2)
+    bg.save(os.path.join(layer_dir, "background.png"))
+    
+    # 2. Middle Layer (Compass Symbol + Shadow)
+    mid = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    mid_draw = ImageDraw.Draw(mid, 'RGBA')
+    center = size // 2
+    radius = size * 0.35
+    draw_compass_symbol(mid_draw, center+10, center+10, radius, PALETTE['glass_shadow'])
+    draw_compass_symbol(mid_draw, center, center, radius, PALETTE['signal_amber'])
+    mid.save(os.path.join(layer_dir, "middle.png"))
+    
+    # 3. Foreground Layer (Glass Highlights + Edge)
+    fg = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    fg_draw = ImageDraw.Draw(fg, 'RGBA')
+    glass = draw_glass_overlay(fg_draw, size, size)
+    fg.paste(glass, (0,0), glass)
+    fg_draw.rectangle([0, 0, size-1, size-1], outline=(255, 255, 255, 40), width=6)
+    fg.save(os.path.join(layer_dir, "foreground.png"))
+    
+    # 4. Contents.json
+    contents = {
+        "images": [
+            {"filename": "layers/background.png", "idiom": "universal", "scale": "1x", "layer": "background"},
+            {"filename": "layers/middle.png", "idiom": "universal", "scale": "1x", "layer": "middle"},
+            {"filename": "layers/foreground.png", "idiom": "universal", "scale": "1x", "layer": "foreground"}
+        ],
+        "info": {"version": 1, "author": "expo", "liquid-glass": True}
+    }
+    import json
+    with open(os.path.join(ASSETS_DIR, "app.icon", "Contents.json"), "w") as f:
+        json.dump(contents, f, indent=2)
+    
+    print(f"Generated Liquid Glass Icon layers in {layer_dir}")
+
+def generate_marketing_screenshots():
+    # iPhone 16 Pro Max dimensions approx 1290 x 2796
+    width, height = 1290, 2796
+    shot_dir = os.path.join(ASSETS_DIR, "marketing")
+    ensure_dir(shot_dir)
+    
+    titles = [
+        "SOVEREIGN AI NAVIGATION",
+        "ZERO-LATENCY SEARCH",
+        "OFFLINE WEATHER GRID",
+        "TRUTH-VERIFIED SENSORS"
+    ]
+    
+    for i, title in enumerate(titles):
+        img = create_gradient(width, height, PALETTE['deep_ocean'], PALETTE['mid_ocean'])
+        draw = ImageDraw.Draw(img, 'RGBA')
+        
+        # Grid overlay
+        step = 100
+        for y in range(0, height, step):
+            draw.line([(0, y), (width, y)], fill=(255, 255, 255, 5), width=1)
+        for x in range(0, width, step):
+            draw.line([(x, 0), (x, height)], fill=(255, 255, 255, 5), width=1)
+            
+        # Placeholder for Map/UI
+        draw.rectangle([100, 400, width-100, height-600], outline=PALETTE['signal_amber'], width=4)
+        draw.text((width//2, height//2), "MOCK UI PREVIEW", fill=(100, 100, 100), anchor="mm")
+        
+        # Title
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/HelveticaNeue.ttc", 70, index=0)
+        except:
+            font = ImageFont.load_default()
+            
+        bbox = draw.textbbox((0,0), title, font=font)
+        tw = bbox[2] - bbox[0]
+        draw.text(((width - tw)//2, 200), title, fill=PALETTE['text_white'], font=font)
+        
+        filename = os.path.join(shot_dir, f"screenshot_{i+1}.png")
+        img.save(filename)
+        print(f"Generated Marketing Screenshot: {filename}")
+
 if __name__ == "__main__":
     ensure_dir(ASSETS_DIR)
     generate_app_icon()
     generate_adaptive_icon()
     generate_splash_screen()
     generate_favicon()
+    generate_liquid_glass_icon()
+    generate_marketing_screenshots()

@@ -1,0 +1,27 @@
+{
+  "images": [
+    {
+      "filename": "layers/background.png",
+      "idiom": "universal",
+      "scale": "1x",
+      "layer": "background"
+    },
+    {
+      "filename": "layers/middle.png",
+      "idiom": "universal",
+      "scale": "1x",
+      "layer": "middle"
+    },
+    {
+      "filename": "layers/foreground.png",
+      "idiom": "universal",
+      "scale": "1x",
+      "layer": "foreground"
+    }
+  ],
+  "info": {
+    "version": 1,
+    "author": "expo",
+    "liquid-glass": true
+  }
+}

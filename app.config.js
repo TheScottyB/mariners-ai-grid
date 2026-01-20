@@ -29,12 +29,12 @@ export default ({ config }) => {
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff"
+      backgroundColor: "#001B3A"
     },
     ios: {
       supportsTablet: true,
       bundleIdentifier: getBundleId(),
-      icon: "./assets/app-icon.png",
+      icon: "./assets/app.icon",
       infoPlist: {
         NSLocalNetworkUsageDescription: "Required to connect to your boat's Signal K server.",
         NSLocationWhenInUseUsageDescription: "Required to show your current position on the weather grid.",
