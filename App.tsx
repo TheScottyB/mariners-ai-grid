@@ -18,6 +18,8 @@ import { HazardService } from './src/services/HazardService';
 import { TruthChecker, DivergenceReport } from './src/services/TruthChecker';
 import { DebrisPredictor } from './src/services/DebrisPredictor';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import type { FeatureCollection, Point, LineString } from 'geojson';
 
 import { RemoteConfig } from './src/services/RemoteConfig';
@@ -195,6 +197,7 @@ export default function App() {
 
             if (report.isDivergent) {
               console.log(`[App] AI Grid Divergence Level: ${report.level}`);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             }
           }
         }

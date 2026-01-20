@@ -19,6 +19,8 @@ export class SignalKBridge {
   private watchdogTimer: NodeJS.Timeout | null = null;
   private isConnected: boolean = false;
   private pollingRateHz: number = 1; // Normal: 1Hz, Emergency: 10Hz
+  private lastSnapshotTime: number = 0;
+  private readonly MIN_SNAPSHOT_INTERVAL_MS = 10000; // 10s min between snapshots
 
   // Accumulated telemetry state
   private currentTelemetry: Partial<TelemetrySnapshot> & { windU?: number; windV?: number } = {
@@ -27,13 +29,13 @@ export class SignalKBridge {
 
   private onTelemetrySnapshot?: (snapshot: TelemetrySnapshot) => void;
   private onConnectionStatus?: (status: 'connected' | 'disconnected' | 'stale') => void;
-  private onDataReceived?: (data: any) => void;
+  private onDataStream?: (data: any) => void;
 
   /**
    * Initializes the connection and subscribes to marine-critical data.
    */
-  async connect(onDataReceived: (data: any) => void) {
-    this.onDataReceived = onDataReceived;
+  async connect(onDataStream?: (data: any) => void) {
+    this.onDataStream = onDataStream;
     const state = await Network.getNetworkStateAsync();
 
     if (!state.isConnected) {
@@ -65,7 +67,7 @@ export class SignalKBridge {
       try {
         const delta = JSON.parse(event.data);
         this.processDelta(delta);
-        this.onDataReceived?.(delta);
+        this.onDataStream?.(delta);
 
         if (this.hasSufficientTelemetry()) {
           this.emitTelemetrySnapshot();
@@ -158,6 +160,8 @@ export class SignalKBridge {
         { path: "environment.wind.u10", period: periodMs },
         { path: "environment.wind.v10", period: periodMs },
         { path: "environment.outside.pressure", period: pressurePeriod },
+        { path: "environment.outside.temperature", period: periodMs },
+        { path: "environment.outside.humidity", period: periodMs },
       ]
     };
 
@@ -246,6 +250,11 @@ export class SignalKBridge {
 
   private emitTelemetrySnapshot() {
     if (!this.onTelemetrySnapshot) return;
+    
+    const now = Date.now();
+    if (now - this.lastSnapshotTime < this.MIN_SNAPSHOT_INTERVAL_MS) return;
+    
+    this.lastSnapshotTime = now;
     const snapshot: TelemetrySnapshot = {
         position: this.currentTelemetry.position!,
         heading: this.currentTelemetry.heading ?? 0,
