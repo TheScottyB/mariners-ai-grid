@@ -4,5 +4,4 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [x] **Track: Optimize Slicer for ECMWF AIFS Open Data & Parquet Export**
-  *Link: [./tracks/optimize_slicer_20260119/](./tracks/optimize_slicer_20260119/)*
+
