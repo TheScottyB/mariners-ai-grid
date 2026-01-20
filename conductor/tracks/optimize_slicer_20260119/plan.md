@@ -10,7 +10,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Environment & Test Data Setup' (Protocol in workflow.md)
 
 ## Phase 2: Core Slicing Logic
-- [ ] Task: Implement Spatial Cropping
+- [x] Task: Implement Spatial Cropping 775a792
     - [ ] Sub-task: Write tests for `SpatialSlicer` class (input: global xarray, bbox; output: cropped xarray).
     - [ ] Sub-task: Implement `SpatialSlicer` with 2.5-degree buffer logic using `xarray`.
 - [ ] Task: Implement Variable Pruning
