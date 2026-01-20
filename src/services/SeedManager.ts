@@ -12,7 +12,8 @@
 
 import { File, Directory, Paths } from 'expo-file-system';
 
-import { tableFromIPC } from 'apache-arrow';
+// import { tableFromIPC } from 'apache-arrow';
+import { ParquetReader } from './ParquetReader';
 
 import type { FeatureCollection, Point } from 'geojson';
 
@@ -346,99 +347,59 @@ export class SeedManager {
 
 
 
-  /**
-
-   * Parse a Parquet seed file using Apache Arrow.
-
-   */
-
-  async parseParquetSeed(filePath: string): Promise<SeedTimestep[]> {
-
-    const startTime = performance.now();
-
-    const file = new File(filePath);
+    /**
 
 
 
-    // Modern API: Read as bytes (ArrayBuffer) directly
-
-    const buffer = await file.bytes();
-
-    const table = tableFromIPC(buffer);
+     * Parse a Parquet seed file using ParquetReader (hyparquet).
 
 
 
-    const parseTime = performance.now() - startTime;
-
-    console.log(`[SeedManager] Parsed ${table.numRows} rows in ${parseTime.toFixed(1)}ms`);
+     */
 
 
 
-    // ... (Rest of parsing logic remains same) ...
-
-    const latCol = table.getChild('latitude') ?? table.getChild('lat');
-
-    const lonCol = table.getChild('longitude') ?? table.getChild('lon');
-
-    const u10Col = table.getChild('u10');
-
-    const v10Col = table.getChild('v10');
-
-    const timeCol = table.getChild('valid_time') ?? table.getChild('time');
+    async parseParquetSeed(filePath: string): Promise<SeedTimestep[]> {
 
 
 
-    if (!latCol || !lonCol || !u10Col || !v10Col) {
+      const startTime = performance.now();
 
-      throw new Error('Missing required columns');
+
+
+      
+
+
+
+      // Delegate to ParquetReader
+
+
+
+      const timesteps = await ParquetReader.read(filePath);
+
+
+
+  
+
+
+
+      const parseTime = performance.now() - startTime;
+
+
+
+      console.log(`[SeedManager] Parsed ${timesteps.length} timesteps in ${parseTime.toFixed(1)}ms`);
+
+
+
+  
+
+
+
+      return timesteps;
+
+
 
     }
-
-
-
-    const timestepMap = new Map<number, SeedTimestep>();
-
-
-
-    for (let i = 0; i < table.numRows; i++) {
-
-      const validTime = timeCol?.get(i) ?? Date.now();
-
-      const lat = latCol.get(i) as number;
-
-      const lon = lonCol.get(i) as number;
-
-      const u10 = u10Col.get(i) as number;
-
-      const v10 = v10Col.get(i) as number;
-
-
-
-      if (!timestepMap.has(validTime)) {
-
-        timestepMap.set(validTime, {
-
-          validTime,
-
-          windData: [],
-
-        });
-
-      }
-
-
-
-      const timestep = timestepMap.get(validTime)!;
-
-      timestep.windData.push({ lat, lon, u10, v10, timestamp: validTime });
-
-    }
-
-
-
-    return Array.from(timestepMap.values()).sort((a, b) => a.validTime - b.validTime);
-
-  }
 
 
 

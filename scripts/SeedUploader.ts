@@ -37,10 +37,10 @@ async function uploadSeeds() {
     return;
   }
 
-  const files = fs.readdirSync(SEED_DIR).filter(f => f.endsWith('.seed.zst'));
+  const files = fs.readdirSync(SEED_DIR).filter(f => f.endsWith('.seed.zst') || f.endsWith('.parquet'));
 
   if (files.length === 0) {
-    console.log('No .seed.zst files found. Run "mag-slicer demo" first.');
+    console.log('No .seed.zst or .parquet files found. Run "mag-slicer demo" first.');
     return;
   }
 
