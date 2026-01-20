@@ -30,8 +30,8 @@ class IFSSlicer:
     Slices ECMWF IFS HRES Open Data.
     """
     
-    # IFS HRES Native Resolution is ~9km (0.1 deg)
-    RESOLUTION = 0.1
+    # IFS Open Data is 0.25 deg (~28km), not 0.1 deg
+    RESOLUTION = 0.25
     
     def __init__(self, cache_dir: Optional[Path] = None):
         self.cache_dir = cache_dir or Path("/tmp/mag_cache")
@@ -106,5 +106,5 @@ class IFSSlicer:
             latitudes=ds_sliced.latitude.values,
             longitudes=ds_sliced.longitude.values,
             times=times,
-            metadata={"source": "ecmwf_opendata", "resolution": "9km"}
+            metadata={"source": "ecmwf_opendata", "resolution": "28km"}
         )

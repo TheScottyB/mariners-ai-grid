@@ -32,8 +32,8 @@ class AIFSSlicer:
     Slices ECMWF AIFS Open Data for local AI inference.
     """
     
-    # AIFS Native Resolution is ~9km (0.1 deg) as of Oct 2025 Open Data update
-    RESOLUTION = 0.1
+    # AIFS Open Data is 0.25 deg (~28km), not 0.1 deg
+    RESOLUTION = 0.25
     
     def __init__(self, cache_dir: Optional[Path] = None, ensemble_mode: bool = False):
         self.cache_dir = cache_dir or Path("/tmp/mag_cache")
@@ -67,7 +67,7 @@ class AIFSSlicer:
         steps = list(range(0, forecast_hours + 1, time_step_hours))
         
         # 3. Fetch Data with Fallback
-        # ECMWF Open Data Advantage: Fetch native 0.1 deg (9km) resolution
+        # ECMWF Open Data Advantage: Fetch native 0.25 deg (28km) resolution
         pruner = VariablePruner("marine")
         sfc_params = pruner.get_ecmwf_params("sfc")
         pl_params = pruner.get_ecmwf_params("pl")
