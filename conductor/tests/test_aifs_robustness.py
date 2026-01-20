@@ -99,4 +99,4 @@ class TestAIFSFallback:
         """Verify resolution is set to 0.1 deg (9km) logic in theory"""
         # Note: We reverted the explicit 'resol' param in the code,
         # but we should ensure the Slicer class constant is correct
-        assert AIFSSlicer.RESOLUTION == 0.1
+        assert AIFSSlicer.RESOLUTION == 0.25

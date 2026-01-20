@@ -15,20 +15,74 @@ The server will run at http://localhost:8082 and serve:
 
 import http.server
 import socketserver
+import json
+import subprocess
+import hashlib
 from pathlib import Path
 import sys
+import os
 
-PORT = 8082
+PORT = 8089
 SEED_DIR = Path(__file__).parent.parent / "conductor" / "demo_seeds"
-
+PROJECT_ROOT = Path(__file__).parent.parent
 
 class SeedHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
-    """HTTP handler that serves from demo_seeds directory"""
+    """HTTP handler that serves from demo_seeds directory and handles dynamic slicing"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(SEED_DIR), **kwargs)
 
+    def do_POST(self):
+        if self.path == '/slice':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            params = json.loads(post_data)
+            
+            lat = params.get('lat')
+            lon = params.get('lon')
+            radius = params.get('radius', 300)
+            
+            print(f"[Seed Server] 🛰️  Requesting REAL slice for: {lat}, {lon} (r={radius}nm)")
+            
+            try:
+                loc_hash = hashlib.md5(f"{lat:.2f}_{lon:.2f}".encode()).hexdigest()[:6]
+                print(f"[Seed Server] 🛰️  Requesting REAL slice for: {lat}, {lon} (hash={loc_hash})")
+                
+                cmd = [
+                    "uv", "run", "python", "-m", "slicer.cli", "slice",
+                    "--lat", str(lat),
+                    "--lon", str(lon),
+                    "--radius", str(radius),
+                    "--hours", "24",
+                    "--output", str(SEED_DIR)
+                ]
+                
+                result = subprocess.run(cmd, cwd=str(PROJECT_ROOT / "conductor"), capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    # Look for the file with the matching loc_hash
+                    pattern = f"*_{loc_hash}.parquet"
+                    files = sorted(SEED_DIR.glob(pattern), key=os.path.getmtime, reverse=True)
+                    if files:
+                        new_file = files[0].name
+                        response = {"status": "success", "url": f"http://{self.headers['Host']}/{new_file}", "filename": new_file}
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps(response).encode())
+                        return
+                
+                print(f"[Seed Server] ❌ Slicing failed or no file found. Error: {result.stderr}")
+                self.send_error(500, "Slicing failed")
+                
+            except Exception as e:
+                print(f"[Seed Server] ❌ Error: {e}")
+                self.send_error(500, str(e))
+        else:
+            self.send_error(404)
+
     def end_headers(self):
+        # ... (rest of headers)
         # Set proper MIME types
         if self.path.endswith('.parquet'):
             self.send_header('Content-Type', 'application/octet-stream')

@@ -14,6 +14,7 @@ Enforces:
 """
 
 import logging
+import hashlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -29,18 +30,26 @@ logger = logging.getLogger(__name__)
 
 class AIFSSlicer:
     """
-    Slices ECMWF AIFS Open Data for local AI inference.
+    Slices ECMWF Open Data (AIFS or HRES) for local AI inference.
     """
     
-    # AIFS Open Data is 0.25 deg (~28km), not 0.1 deg
+    # ECMWF Open Data resolution
     RESOLUTION = 0.25
     
-    def __init__(self, cache_dir: Optional[Path] = None, ensemble_mode: bool = False):
+    def __init__(self, cache_dir: Optional[Path] = None, model_type: str = "aifs"):
+        """
+        Args:
+            model_type: "aifs" (AI model) or "ifs" (Traditional HRES)
+        """
         self.cache_dir = cache_dir or Path("/tmp/mag_cache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.ensemble_mode = ensemble_mode
+        self.model_type = model_type
         
-        model_name = "aifs-ens" if ensemble_mode else "aifs-single"
+        if model_type == "aifs":
+            model_name = "aifs-single"
+        else:
+            model_name = "ifs-hres"
+
         # source="aws" to use S3 mirror
         self.client = Client(source="aws", model=model_name, resol="0p25")
 
@@ -61,22 +70,24 @@ class AIFSSlicer:
         buffered_bbox = BoundingBox(
             lat_min=max(-90, bbox.lat_min - BUFFER_DEG),
             lat_max=min(90, bbox.lat_max + BUFFER_DEG),
-            lon_min=bbox.lon_min - BUFFER_DEG, # TODO: Handle wrap
+            lon_min=bbox.lon_min - BUFFER_DEG, 
             lon_max=bbox.lon_max + BUFFER_DEG
         )
         logger.info(f"Buffered BBox: {buffered_bbox} (Original: {bbox})")
 
         steps = list(range(0, forecast_hours + 1, time_step_hours))
         
+        # Unique cache prefix for this specific region
+        loc_hash = hashlib.md5(f"{bbox.lat_min:.1f}_{bbox.lon_min:.1f}".encode()).hexdigest()[:6]
+        
         # 3. Fetch Data with Fallback
-        # ECMWF Open Data Advantage: Fetch native 0.25 deg (28km) resolution
         pruner = VariablePruner(variable_set)
         sfc_params = pruner.get_ecmwf_params("sfc")
         pl_params = pruner.get_ecmwf_params("pl")
         levels = [1000, 850, 500, 200] 
         
-        target_sfc = self.cache_dir / f"{self.client.model}_sfc.grib2"
-        target_pl = self.cache_dir / f"{self.client.model}_pl.grib2"
+        target_sfc = self.cache_dir / f"{self.client.model}_{loc_hash}_sfc.grib2"
+        target_pl = self.cache_dir / f"{self.client.model}_{loc_hash}_pl.grib2"
         
         model_run_date = None
         
@@ -106,20 +117,29 @@ class AIFSSlicer:
         ds_sfc = xr.open_dataset(target_sfc, engine="cfgrib")
         ds_pl = xr.open_dataset(target_pl, engine="cfgrib")
         
-        # Merge
-        ds = xr.merge([ds_sfc, ds_pl])
+        # Merge and ALIGN (Fixes the ArrowInvalid length mismatch)
+        ds = xr.merge([ds_sfc, ds_pl], compat='override')
         
         # Crop to buffered bbox
-        # xarray slicing: latitude is usually descending in GRIB (90 -> -90)
         ds_sliced = ds.sel(
             latitude=slice(buffered_bbox.lat_max, buffered_bbox.lat_min),
             longitude=slice(buffered_bbox.lon_min, buffered_bbox.lon_max)
         )
+
+        # Force all variables to the same spatial grid to avoid Parquet errors
+        # (Lakes often have different masking in GRIB)
+        grid_lat = ds_sliced.latitude
+        grid_lon = ds_sliced.longitude
         
         # 5. Create WeatherSeed
         variables = {}
         for var_name in ds_sliced.data_vars:
             da = ds_sliced[var_name]
+            
+            # Ensure spatial alignment
+            if da.latitude.size != grid_lat.size or da.longitude.size != grid_lon.size:
+                da = da.interp(latitude=grid_lat, longitude=grid_lon)
+
             # Check for vertical coordinate (Flatten 4D -> 3D)
             if "isobaricInhPa" in da.dims:
                 # Iterate over levels and flatten

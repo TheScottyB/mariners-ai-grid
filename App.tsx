@@ -268,16 +268,26 @@ export default function App() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     try {
-      // For MVP Explorer Mode, we fetch the static Pacific/McHenry starter seed
-      await seedManager.downloadSeed(
-        'http://192.168.12.172:8082/mock_a9cafafcfcb1_2026011900.seed.zst'
-      );
+      console.log(`[App] Requesting real slice for current location: ${vesselLocation.lat}, ${vesselLocation.lng}`);
+      
+      // Request live slice from backend
+      await seedManager.requestLiveSlice(vesselLocation.lat, vesselLocation.lng);
+      
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Seed Downloaded", "New weather data is active.");
+      Alert.alert("Real-Time Slice Ready", "Fresh weather data for your location has been processed.");
     } catch (e) {
       console.warn("Seed download failed:", e);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Download Failed", "Check internet connection.");
+      
+      // Fallback to static starter if live slice fails (e.g. offline)
+      try {
+        console.log("[App] Live slice failed, falling back to static starter...");
+        await seedManager.downloadSeed(
+          'http://192.168.12.172:8089/mock_hres_a9cafafcfcb1_2026011912.parquet'
+        );
+      } catch (e2) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert("Download Failed", "Check internet connection.");
+      }
     } finally {
       setIsDownloadingSeed(false);
     }

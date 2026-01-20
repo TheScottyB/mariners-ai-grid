@@ -5,7 +5,7 @@
  */
 
 import { File } from 'expo-file-system';
-import { parquetRead, parquetMetadata } from 'hyparquet';
+import { parquetRead, parquetMetadata } from 'hyparquet/src/index.js';
 import { decompress } from 'fzstd';
 import { WindDataPoint } from '../utils/geoUtils';
 
@@ -110,6 +110,11 @@ export class ParquetReader {
         
         const ts = timestepMap.get(validTime)!;
         
+        // DEBUG: Log first row of each timestep
+        if (ts.windData.length === 0) {
+            console.log(`[ParquetReader] First row for time ${new Date(validTime).toISOString()}: u10=${u10}, v10=${v10}, swh=${swh}`);
+        }
+
         // Add Wind Point
         if (u10 !== undefined && v10 !== undefined) {
             ts.windData.push({

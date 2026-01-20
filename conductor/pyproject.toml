@@ -98,3 +98,8 @@ python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.0.0",
+]

@@ -151,7 +151,7 @@ class BoundingBox:
             round(self.lat_min * 4) / 4,
             round(self.lat_max * 4) / 4,
             round(self.lon_min * 4) / 4,
-            round(self.lon_max * 4) / 4,
+            round(self.lon_min * 4) / 4,
         )
         return hashlib.md5(str(rounded).encode()).hexdigest()[:12]
 
@@ -698,13 +698,37 @@ class SeedBuilder:
         """
         from slicer.aifs import AIFSSlicer
         from slicer.export import SeedExporter
+        from openmeteo_client import OpenMeteoMarineSlicer
 
         # 1. Define BBox
         bbox = BoundingBox.from_center(lat, lon, radius_nm)
+        loc_hash = hashlib.md5(f"{lat:.2f}_{lon:.2f}".encode()).hexdigest()[:6]
 
-        # 2. Slice (includes Fetch and Spatial Buffer)
-        slicer = AIFSSlicer(cache_dir=self.cache_dir)
-        seed = slicer.slice(bbox, forecast_hours=forecast_hours, variable_set=variable_set)
+        # 2. Slice
+        try:
+            print(f"[SeedBuilder] Slicing AIFS for {lat}, {lon}")
+            slicer = AIFSSlicer(cache_dir=self.cache_dir, model_type="aifs")
+            seed = slicer.slice(bbox, forecast_hours=forecast_hours, variable_set=variable_set)
+            seed.seed_id = f"{seed.seed_id}_{loc_hash}"
+
+            # Fallback check for waves (AI models often lack waves over lakes)
+            swh = seed.variables.get("swh")
+            has_waves = False
+            if swh is not None and swh.size > 0:
+                if np.nanmax(swh) > 0.001: 
+                    has_waves = True
+
+            if not has_waves and variable_set in ["standard", "marine", "full"]:
+                print("[SeedBuilder] AI model lacks waves here. Falling back to Open-Meteo")
+                om_slicer = OpenMeteoMarineSlicer()
+                seed = om_slicer.slice(bbox, forecast_hours=forecast_hours)
+                seed.seed_id = f"{seed.seed_id}_{loc_hash}"
+
+        except Exception as e:
+            print(f"[SeedBuilder] Primary slice failed: {e}. Using Open-Meteo fallback.")
+            om_slicer = OpenMeteoMarineSlicer()
+            seed = om_slicer.slice(bbox, forecast_hours=forecast_hours)
+            seed.seed_id = f"{seed.seed_id}_{loc_hash}"
 
         # 3. Export (includes Pruning and Quantization)
         exporter = SeedExporter(output_dir=self.output_dir)
@@ -712,4 +736,3 @@ class SeedBuilder:
 
         logger.info(f"Seed built successfully: {output_path}")
         return output_path
-                                    

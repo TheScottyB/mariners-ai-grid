@@ -18,7 +18,7 @@ class TestAIFSSlicer:
         """Test slicer initialization"""
         slicer = AIFSSlicer()
         assert slicer.client is not None
-        mock_client.assert_called_with("ecmwf", model="aifs-single")
+        mock_client.assert_called_with(source="aws", model="aifs-single", resol="0p25")
 
     @patch("slicer.aifs.Client")
     @patch("slicer.aifs.xr")

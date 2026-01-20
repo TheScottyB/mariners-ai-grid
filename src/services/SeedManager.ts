@@ -69,67 +69,131 @@ export class SeedManager {
 
 
 
-  /**
-
-   * Initialize the seed directory and load metadata index.
-
-   */
-
-  async initialize(): Promise<void> {
-
-    if (!this.seedDir.exists) {
-
-      this.seedDir.create();
-
-      console.log('[SeedManager] Created seed directory');
-
-    }
+    /**
 
 
 
-    await this.loadMetadataIndex();
+     * Initialize the seed directory and load metadata index.
 
-    await this.cleanupExpiredSeeds();
 
-    await this.enforceLRU();
 
-    
+     */
 
-    // Auto-load "Home Slice" (McHenry/Chicago) if no seeds exist
 
-    if (this.metadataIndex.length === 0) {
 
-      console.log('[SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...');
+    async initialize(): Promise<void> {
 
-      try {
 
-        // Simulate network delay for realism
 
-        await new Promise(resolve => setTimeout(resolve, 1500));
+      if (!this.seedDir.exists) {
 
-        
 
-        await this.downloadSeed(
 
-          'http://192.168.12.172:8082/mock_a9cafafcfcb1_2026011900.seed.zst',
+        this.seedDir.create();
 
-          'local'
 
-        );
 
-      } catch (e) {
+        console.log('[SeedManager] Created seed directory');
 
-        console.warn('[SeedManager] Failed to fetch Home Slice:', e);
+
 
       }
 
+
+
+  
+
+
+
+          await this.loadMetadataIndex();
+
+
+
+  
+
+
+
+      
+
+
+
+  
+
+
+
+          await this.cleanupExpiredSeeds();
+
+
+
+  
+
+
+
+          await this.enforceLRU();
+
+
+
+      
+
+
+
+      // Auto-load Home Seed if no seeds exist
+
+
+
+      if (this.metadataIndex.length === 0) {
+
+
+
+        console.log('[SeedManager] No seeds found. Fetching Pacific Starter (Parquet)...');
+
+
+
+        try {
+
+
+
+          await this.downloadSeed(
+
+
+
+            'http://192.168.12.172:8089/mock_hres_a9cafafcfcb1_2026011912.parquet',
+
+
+
+            'local'
+
+
+
+          );
+
+
+
+        } catch (e) {
+
+
+
+          console.warn('[SeedManager] Failed to fetch starter seed:', e);
+
+
+
+        }
+
+
+
+      }
+
+
+
+  
+
+
+
+      console.log(`[SeedManager] Initialized with ${this.metadataIndex.length} seeds`);
+
+
+
     }
-
-
-
-    console.log(`[SeedManager] Initialized with ${this.metadataIndex.length} seeds`);
-
-  }
 
 
 
@@ -383,11 +447,7 @@ export class SeedManager {
 
 
 
-      const parseTime = performance.now() - startTime;
-
-
-
-      console.log(`[SeedManager] Parsed ${timesteps.length} timesteps in ${parseTime.toFixed(1)}ms`);
+          const parseTime = performance.now() - startTime;
 
 
 
@@ -395,7 +455,47 @@ export class SeedManager {
 
 
 
-      return timesteps;
+          console.log(`[SeedManager] Parsed ${timesteps.length} timesteps in ${parseTime.toFixed(1)}ms`);
+
+
+
+  
+
+
+
+          if (timesteps.length > 0) {
+
+
+
+  
+
+
+
+            console.log(`[SeedManager] Timestep 0 has ${timesteps[0].windData.length} wind points. Bounds: ${JSON.stringify(this.calculateBounds(timesteps[0].windData))}`);
+
+
+
+  
+
+
+
+          }
+
+
+
+  
+
+
+
+      
+
+
+
+  
+
+
+
+          return timesteps;
 
 
 
@@ -463,6 +563,31 @@ export class SeedManager {
 
 
 
+  /**
+   * Request a real-time slice for specific coordinates from the backend.
+   */
+  async requestLiveSlice(lat: number, lon: number): Promise<SeedMetadata> {
+    console.log(`[SeedManager] Requesting live slice for ${lat}, ${lon}...`);
+    
+    // 1. Call backend API to trigger slicing
+    const response = await fetch('http://192.168.12.172:8089/slice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lon, radius: 250 })
+    });
+
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`Slicing request failed: ${err}`);
+    }
+
+    const data = await response.json();
+    console.log(`[SeedManager] Slicing success: ${data.filename}. Downloading...`);
+
+    // 2. Download the resulting file
+    return await this.downloadSeed(data.url, 'wifi');
+  }
+
   getRawSeed(seedId: string): WeatherSeed | null {
 
     return this.rawSeedCache.get(seedId) || null;
@@ -471,35 +596,67 @@ export class SeedManager {
 
 
 
-  async getWindGeoJSON(seedId: string, timestepIndex: number = 0): Promise<FeatureCollection<Point>> {
+    async getWindGeoJSON(seedId: string, timestepIndex: number = 0): Promise<FeatureCollection<Point>> {
 
-    const seed = this.seedCache.get(seedId);
 
-    if (!seed || !seed.timesteps[timestepIndex]) {
 
-      throw new Error(`Seed or timestep not found: ${seedId}`);
+      const seed = this.seedCache.get(seedId);
+
+
+
+      if (!seed || !seed.timesteps[timestepIndex]) {
+
+
+
+        // Return empty instead of throwing
+
+
+
+        return { type: 'FeatureCollection', features: [] };
+
+
+
+      }
+
+
+
+      return windDataToGeoJSON(seed.timesteps[timestepIndex].windData);
+
+
 
     }
 
-    return windDataToGeoJSON(seed.timesteps[timestepIndex].windData);
-
-  }
 
 
+  
 
-  async getWaveGeoJSON(seedId: string, timestepIndex: number = 0): Promise<FeatureCollection<Point> | null> {
 
-    const seed = this.seedCache.get(seedId);
 
-    if (!seed || !seed.timesteps[timestepIndex] || !seed.timesteps[timestepIndex].waveData) {
+    async getWaveGeoJSON(seedId: string, timestepIndex: number = 0): Promise<FeatureCollection<Point> | null> {
 
-      return null;
+
+
+      const seed = this.seedCache.get(seedId);
+
+
+
+      if (!seed || !seed.timesteps[timestepIndex] || !seed.timesteps[timestepIndex].waveData) {
+
+
+
+        return null;
+
+
+
+      }
+
+
+
+      return waveDataToGeoJSON(seed.timesteps[timestepIndex].waveData!);
+
+
 
     }
-
-    return waveDataToGeoJSON(seed.timesteps[timestepIndex].waveData!);
-
-  }
 
 
 

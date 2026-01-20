@@ -58,7 +58,7 @@ const SIGNAL_K_URL_KEY = 'signal_k_server_url';
 const MARINERS_CODE_ENABLED_KEY = 'mariners_code_enabled';
 
 // Default Pacific Starter seed URL (replace with your actual hosted seed)
-const DEFAULT_SEED_URL = 'http://192.168.12.172:8082/mock_a9cafafcfcb1_2026011900.seed.zst';
+const DEFAULT_SEED_URL = 'http://192.168.12.172:8089/mock_hres_a9cafafcfcb1_2026011912.parquet';
 
 // EAS Analytics events (would integrate with your analytics service)
 const ANALYTICS_EVENTS = {

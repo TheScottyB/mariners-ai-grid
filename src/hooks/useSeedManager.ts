@@ -48,6 +48,7 @@ export interface UseSeedManagerResult {
   nextTimestep: () => void;
   prevTimestep: () => void;
   downloadSeed: (url: string) => Promise<SeedMetadata>;
+  requestLiveSlice: (lat: number, lon: number) => Promise<SeedMetadata>;
   importSeed: (localPath: string) => Promise<SeedMetadata>;
   deleteSeed: (seedId: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -221,10 +222,8 @@ export function useSeedManager(options: UseSeedManagerOptions = {}): UseSeedMana
       setAvailableSeeds(managerRef.current.listSeeds());
       setStorageUsedMB((await managerRef.current.getStorageUsed()) / (1024 * 1024));
 
-      // Auto-select if no active seed
-      if (!activeSeed) {
-        await selectSeedInternal(metadata.id);
-      }
+      // Auto-select (Always for testing)
+      await selectSeedInternal(metadata.id);
 
       return metadata;
     } catch (e) {
@@ -235,6 +234,29 @@ export function useSeedManager(options: UseSeedManagerOptions = {}): UseSeedMana
       setIsLoading(false);
     }
   }, [activeSeed, selectSeedInternal]);
+
+  // Request Live Slice
+  const requestLiveSlice = useCallback(async (lat: number, lon: number): Promise<SeedMetadata> => {
+    if (!managerRef.current) throw new Error('Not initialized');
+    setIsLoading(true);
+    setError(null);
+    try {
+      const metadata = await managerRef.current.requestLiveSlice(lat, lon);
+      setAvailableSeeds(managerRef.current.listSeeds());
+      setStorageUsedMB((await managerRef.current.getStorageUsed()) / (1024 * 1024));
+      
+      // Auto-select the new live slice
+      await selectSeedInternal(metadata.id);
+      
+      return metadata;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Live slice failed';
+      setError(msg);
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Import local seed
   const importSeed = useCallback(async (localPath: string): Promise<SeedMetadata> => {
@@ -305,6 +327,7 @@ export function useSeedManager(options: UseSeedManagerOptions = {}): UseSeedMana
     nextTimestep,
     prevTimestep,
     downloadSeed,
+    requestLiveSlice,
     importSeed,
     deleteSeed,
     refresh,
