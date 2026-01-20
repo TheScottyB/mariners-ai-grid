@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SeedManager } from '../SeedManager';
+import { VecDB } from '../VecDB';
+
+// Mock op-sqlite
+vi.mock('@op-engineering/op-sqlite', () => ({
+  open: vi.fn(() => ({
+    execute: vi.fn().mockResolvedValue({ rows: [] }),
+    executeBatch: vi.fn().mockResolvedValue({}),
+  })),
+}));
 
 // Mock expo-file-system/legacy
 vi.mock('expo-file-system/legacy', () => ({
@@ -41,7 +50,50 @@ describe('Space Reclamation Audit (LRU Eviction)', () => {
     expect(ids).toContain('s2');
     expect(ids).toContain('s3');
     
-    const total = await manager.getStorageUsed();
-    expect(total).toBe(10 * 1024 * 1024);
-  });
-});
+        const total = await manager.getStorageUsed();
+    
+        expect(total).toBe(10 * 1024 * 1024);
+    
+      });
+    
+    
+    
+      it('should reclaim space via optimize and VACUUM commands', async () => {
+    
+        const mockDb = {
+    
+          execute: vi.fn().mockResolvedValue({ rows: [] }),
+    
+        };
+    
+        const vecdb = new VecDB(mockDb as any);
+    
+        // @ts-ignore
+    
+        vecdb.initialized = true;
+    
+    
+    
+        await vecdb.optimize();
+    
+    
+    
+        // Verify the v0.2.x optimize syntax
+    
+        expect(mockDb.execute).toHaveBeenCalledWith(
+    
+          expect.stringContaining('VALUES ("optimize")')
+    
+        );
+    
+        
+    
+        // Verify standard vacuum
+    
+        expect(mockDb.execute).toHaveBeenCalledWith('VACUUM');
+    
+      });
+    
+    });
+    
+    

@@ -112,7 +112,8 @@ export class HazardService {
         original_lon REAL NOT NULL,
         last_drift_update INTEGER,
         decay_rate REAL NOT NULL,
-        expires_at INTEGER NOT NULL
+        expires_at INTEGER NOT NULL,
+        predicted_path_json TEXT
       );`);
 
     await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_location ON marine_hazards(lat, lon)');

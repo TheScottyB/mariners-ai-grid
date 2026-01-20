@@ -510,6 +510,24 @@ export class VecDB {
     };
   }
 
+  /**
+   * Reclaim shadow table space and shrink the database file.
+   * Leverages sqlite-vec v0.2.x 'optimize' and standard VACUUM.
+   */
+  async optimize(): Promise<void> {
+    if (!this.initialized) return;
+    
+    console.log('[VecDB] Running space reclamation audit...');
+    
+    // 1. Optimize the vector virtual table (vlasky fork feature)
+    await this.db.execute('INSERT INTO atmospheric_vectors(atmospheric_vectors) VALUES ("optimize")');
+    
+    // 2. Standard SQLite vacuum to shrink the file on disk
+    await this.db.execute('VACUUM');
+    
+    console.log('[VecDB] Optimization complete');
+  }
+
   // Private helpers
   private normalizeTemp(kelvin: number): number {
     const celsius = kelvin - 273.15;
