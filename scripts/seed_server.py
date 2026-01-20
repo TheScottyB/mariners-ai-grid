@@ -29,17 +29,21 @@ class SeedHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(SEED_DIR), **kwargs)
 
     def end_headers(self):
-        # Add CORS headers for mobile app access
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', '*')
         # Set proper MIME types
         if self.path.endswith('.parquet'):
             self.send_header('Content-Type', 'application/octet-stream')
         elif self.path.endswith('.seed.zst') or self.path.endswith('.zst'):
             self.send_header('Content-Type', 'application/zstd')
+        # Add CORS headers for mobile app access
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', '*')
         super().end_headers()
 
+    def do_HEAD(self):
+        """Override HEAD to ensure CORS headers are sent"""
+        super().do_HEAD()
+    
     def do_OPTIONS(self):
         """Handle preflight requests"""
         self.send_response(200)
