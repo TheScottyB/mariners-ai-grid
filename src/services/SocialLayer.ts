@@ -44,51 +44,35 @@ export class SocialLayer {
    */
 
   async findHazardsNearPath(vesselLat: number, vesselLon: number, radiusNm: number = 50): Promise<SpatialHazard[]> {
-
     try {
-
+      const vesselVector = new Float32Array([vesselLat, vesselLon]);
       const query = `
-
         SELECT 
-
-          id,
-
-          type as hazard_type, 
-
-          description, 
-
-          reported_at as timestamp,
-
-          distance(location_vec, [?, ?]) as dist
-
-        FROM marine_hazards
-
-        WHERE dist < ?
-
-        ORDER BY timestamp DESC;
-
+          h.id,
+          h.type as hazard_type, 
+          h.description, 
+          h.reported_at as timestamp,
+          v.distance
+        FROM marine_hazards_vec v
+        JOIN marine_hazards h ON v.id = h.id
+        WHERE v.location MATCH vec_f32(?) 
+          AND k = 50 
+          AND v.distance < ?
+        ORDER BY v.distance ASC;
       `;
-
       
-
-      const result = await this.db.execute(query, [vesselLat, vesselLon, radiusNm]);
+      const result = await this.db.execute(query, [vesselVector, radiusNm]);
 
       const rows = result.rows || [];
 
       
 
       return rows.map((row: any) => ({
-
         id: row.id,
-
         type: row.hazard_type,
-
         description: row.description,
-
         timestamp: row.timestamp,
-
-        distance: row.dist
-
+        distance: row.distance
       }));
 
 
