@@ -41,7 +41,8 @@ class AIFSSlicer:
         self.ensemble_mode = ensemble_mode
         
         model_name = "aifs-ens" if ensemble_mode else "aifs-single"
-        self.client = Client("ecmwf", model=model_name)
+        # source="aws" to use S3 mirror
+        self.client = Client(source="aws", model=model_name, resol="0p25")
 
     def slice(
         self,

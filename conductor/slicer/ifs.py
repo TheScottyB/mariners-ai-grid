@@ -37,7 +37,8 @@ class IFSSlicer:
         self.cache_dir = cache_dir or Path("/tmp/mag_cache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         # model="ifs" for physics-driven high-res model
-        self.client = Client("ecmwf", model="ifs")
+        # source="aws" to use S3 mirror (avoids rate limits)
+        self.client = Client(source="aws", model="ifs", resol="0p25")
 
     def slice(
         self,
@@ -61,22 +62,37 @@ class IFSSlicer:
         
         target_file = self.cache_dir / f"ifs_hres_{bbox.cache_key()}.grib2"
         
-        try:
-            logger.info(f"Fetching IFS HRES (9km) for {bbox}...")
-            # Optimization: check cache handled by ingest_cron or similar?
-            # For now, direct fetch
-            self.client.retrieve(
-                date=0,      # Latest
-                time=0,      # 00Z (fallback logic could be added)
-                step=steps,
-                type="fc",
-                param=sfc_params,
-                target=str(target_file)
-            )
-            model_run_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        except Exception as e:
-            logger.error(f"IFS retrieval failed: {e}")
-            raise RuntimeError("Could not fetch IFS data.") from e
+        model_run_date = None
+        
+        # Robust Retrieval Strategy: Try Today 00Z -> Yesterday 12Z -> Yesterday 00Z
+        retrieval_attempts = [
+            (0, 0),   # Today 00Z
+            (-1, 12), # Yesterday 12Z
+            (-1, 0)   # Yesterday 00Z
+        ]
+        
+        for day_offset, hour in retrieval_attempts:
+            try:
+                logger.info(f"Attempting fetch: Date={day_offset}, Time={hour}Z...")
+                self.client.retrieve(
+                    date=day_offset,
+                    time=hour,
+                    step=steps,
+                    type="fc",
+                    param=sfc_params,
+                    target=str(target_file)
+                )
+                # Success
+                base_date = datetime.now(timezone.utc) + timedelta(days=day_offset)
+                model_run_date = base_date.replace(hour=hour, minute=0, second=0, microsecond=0)
+                logger.info(f"Successfully fetched model run: {model_run_date}")
+                break
+            except Exception as e:
+                logger.warning(f"Fetch failed for {day_offset}/{hour}Z: {e}")
+                continue
+                
+        if model_run_date is None:
+            raise RuntimeError("Could not fetch IFS data after all fallback attempts.")
 
         # Parse and Crop
         ds = xr.open_dataset(target_file, engine="cfgrib")

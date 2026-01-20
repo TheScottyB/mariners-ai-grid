@@ -13,14 +13,15 @@
 ```
 Need weather data?
 │
-├─ Coastal/harbor navigation? → Use HTTP IFS HRES (9km)
-│   └─ Accept rate limits for better resolution
+├─ Coastal/harbor navigation (9km resolution)?
+│   └─ Use Open-Meteo API (ECMWF HRES, no rate limits!) ⭐
 │
-├─ Open ocean routing? → Use S3 IFS Open-Data (25km)
-│   └─ Fast, unlimited downloads, sufficient resolution
+├─ Open ocean routing (25km sufficient)?
+│   └─ Use Official ECMWF API with Azure mirror
 │
-└─ Large-scale analysis? → Use S3 with index-based partial downloads
-    └─ Download only surface params (98% bandwidth reduction)
+└─ Large-scale gridded analysis?
+    ├─ Open ocean: S3 direct access with index files
+    └─ Coastal: Open-Meteo grid queries
 ```
 
 ## Recommended: Official Python API (No Rate Limits)

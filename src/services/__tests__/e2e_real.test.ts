@@ -30,7 +30,8 @@ vi.unmock('fzstd');
 
 describe('Mariner AI Grid Real Data Integration', () => {
   it('should fetch and process a real .seed.zst from the local server', async () => {
-    const seedUrl = 'http://127.0.0.1:8082/mock_a9cafafcfcb1_2026011900.seed.zst';
+    // Updated to the real S3-derived seed we just generated
+    const seedUrl = 'http://127.0.0.1:8082/ifs_hres_2026011912.seed.zst';
     console.log(`[Integration] Fetching from ${seedUrl}...`);
 
     try {
