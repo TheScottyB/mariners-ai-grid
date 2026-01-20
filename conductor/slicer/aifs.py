@@ -119,7 +119,16 @@ class AIFSSlicer:
         # 5. Create WeatherSeed
         variables = {}
         for var_name in ds_sliced.data_vars:
-            variables[var_name] = ds_sliced[var_name].values.astype(np.float32)
+            da = ds_sliced[var_name]
+            # Check for vertical coordinate (Flatten 4D -> 3D)
+            if "isobaricInhPa" in da.dims:
+                # Iterate over levels and flatten
+                for level in da.isobaricInhPa.values:
+                    # Naming convention: {var}_{level} (e.g. z_500, t_850)
+                    new_name = f"{var_name}_{int(level)}"
+                    variables[new_name] = da.sel(isobaricInhPa=level, drop=True).values.astype(np.float32)
+            else:
+                variables[var_name] = da.values.astype(np.float32)
             
         times = [model_run_date + timedelta(hours=h) for h in steps]
         
