@@ -75,6 +75,7 @@ export default function App() {
   const dbRef = useRef<DB | null>(null);
   const lastTelemetryRef = useRef<TelemetrySnapshot | null>(null);
   const activeSeedRef = useRef<any>(null); // Ref to current seed from manager
+  const servicesInitializedRef = useRef(false);
 
   // Weather Seed Manager
   const seedManager = useSeedManager({
@@ -102,6 +103,9 @@ export default function App() {
   }, [isStressTestActive, vesselLocation.lat, vesselLocation.lng]);
 
   const initializeServices = useCallback(async () => {
+    if (servicesInitializedRef.current) return;
+    servicesInitializedRef.current = true;
+
     let driftInterval: NodeJS.Timeout | null = null;
     try {
       // 0. Initialize Remote Config

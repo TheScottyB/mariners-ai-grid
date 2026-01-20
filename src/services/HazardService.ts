@@ -116,6 +116,20 @@ export class HazardService {
         predicted_path_json TEXT
       );`);
 
+    // Migration: Add columns if they don't exist (SQLite doesn't support IF NOT EXISTS for ADD COLUMN)
+    try {
+      await this.db.execute('ALTER TABLE marine_hazards ADD COLUMN predicted_path_json TEXT;');
+    } catch (e) {
+      // Column likely already exists
+    }
+    try {
+      await this.db.execute('ALTER TABLE marine_hazards ADD COLUMN drift_u REAL DEFAULT 0;');
+      await this.db.execute('ALTER TABLE marine_hazards ADD COLUMN drift_v REAL DEFAULT 0;');
+    } catch (e) {}
+    try {
+      await this.db.execute('ALTER TABLE marine_hazards ADD COLUMN location_vec FLOAT[2];');
+    } catch (e) {}
+
     await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_location ON marine_hazards(lat, lon)');
     await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_expires ON marine_hazards(expires_at)');
     await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_type ON marine_hazards(type)');
