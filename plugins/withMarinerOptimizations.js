@@ -1,4 +1,4 @@
-const { withDangerousMod } = require('@expo/config-plugins');
+const { withDangerousMod, withInfoPlist } = require('@expo/config-plugins');
 const { mergeContents } = require('@expo/config-plugins/build/utils/generateCode');
 const fs = require('fs');
 const path = require('path');
@@ -7,22 +7,28 @@ const path = require('path');
  * Mariner "Zero Latency" Optimization Plugin
  *
  * This plugin injects low-level LLVM/Clang optimization flags into the
- * op-sqlite build process to maximize performance on Apple Silicon.
+ * op-sqlite build process and enables 120Hz ProMotion support.
  *
  * Target Hardware:
+ * - iPhone 13 Pro+ (ProMotion 120Hz)
  * - iPhone 11+ (A13-A19 Bionic)
  * - iPad Pro M4/M5 (Primary "Chart Table" target)
- * - MacBook Pro M5 (Development/Supercomputer)
  *
  * Optimizations Applied:
+ * - ProMotion Support (CADisableMinimumFrameDurationOnPhone, UIPreferredFramesPerSecond)
  * - GCC_OPTIMIZATION_LEVEL=3 (Aggressive optimization)
  * - -ffast-math (20-40% speedup for vector distance calculations)
- * - -mfpu=neon (Explicit NEON SIMD activation for ARM64)
  * - Static library linking (Faster startup, avoids dynamic framework issues)
- *
- * @see docs/VECTOR_DB_DECISION.md for full technical rationale
  */
 const withMarinerOptimizations = (config) => {
+  // 1. Enable 120Hz ProMotion support
+  config = withInfoPlist(config, (config) => {
+    config.modResults.CADisableMinimumFrameDurationOnPhone = true;
+    config.modResults.UIPreferredFramesPerSecond = 120;
+    return config;
+  });
+
+  // 2. Inject Podfile optimizations
   return withDangerousMod(config, [
     'ios',
     async (config) => {
