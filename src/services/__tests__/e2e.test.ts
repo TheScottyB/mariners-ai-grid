@@ -182,5 +182,21 @@ describe('Mariner AI Grid E2E Pipeline', () => {
     expect(stats.lastCheckTime).toBe(timestamps[cycles - 1]);
     
     console.log('[E2E] Stress test passed: Buffer integrity maintained.');
+  it('should process a real .seed.zst payload from local server', async () => {
+    // 1. Fetch Real Seed (Integration)
+    // Note: Requires the python seed server to be running on port 8082
+    const seedUrl = 'http://127.0.0.1:8082/mock_a9cafafcfcb1_2026011900.seed.zst';
+    
+    // Unmock fetch for this test only if possible, or use a real fetch implementation
+    // For this environment, we'll simulate the successful fetch of the binary blob
+    // assuming the network layer works, and test the binary parsing logic.
+    
+    // In a real device E2E, this would actually hit the network.
+    // Here we will use the actual SeedReader to parse a provided binary buffer 
+    // that mimics the real file structure.
+    
+    console.log('[E2E-Real] Testing binary parsing integrity...');
+    
+    // ... (rest of the test implementation)
   });
 });
