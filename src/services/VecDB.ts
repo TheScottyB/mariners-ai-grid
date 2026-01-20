@@ -83,8 +83,8 @@ export class VecDB {
       // Load sqlite-vec extension (handled automatically by op-sqlite if configured, 
       // but explicit check confirms availability)
       try {
-        const version = await this.db.execute('SELECT vec_version();');
-        console.log('[VecDB] sqlite-vec Version:', version.rows[0]);
+        const versionResult = await this.db.execute('SELECT vec_version() as version;');
+        console.log(`[VecDB] Mariner AI Grid Vector Engine: v${versionResult.rows?.[0]?.version}`);
       } catch (vecError: any) {
         console.warn('[VecDB] sqlite-vec extension not loaded:', vecError.message);
         return false;

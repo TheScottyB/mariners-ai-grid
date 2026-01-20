@@ -72,6 +72,7 @@
     "babel-preset-expo": "^54.0.9",
     "eas-build-cache-provider": "^16.4.2",
     "jsdom": "^27.4.0",
+    "patch-package": "^8.0.1",
     "protobufjs": "^8.0.0",
     "react-test-renderer": "^19.1.0",
     "ts-proto": "^2.11.0",

@@ -117,7 +117,9 @@ export default ({ config }) => {
       ],
       // Mariner Zero Latency: Apple Silicon optimizations for op-sqlite + sqlite-vec
       // Injects -O3, -ffast-math, -mfpu=neon flags for A13-A19/M4/M5 hardware
-      "./plugins/withMarinerOptimizations"
+      "./plugins/withMarinerOptimizations",
+      // Community Fork Configuration for sqlite-vec
+      "./plugins/with-sqlite-vec/withSqliteVec.js"
       // NOTE: sqlite-vec base config is in package.json: "op-sqlite": { "sqliteVec": true }
     ],
     extra: {
