@@ -16,8 +16,9 @@ import { VesselSnapshot } from './src/services/VesselSnapshot';
 import { GridSync } from './src/services/GridSync';
 import { HazardService } from './src/services/HazardService';
 import { TruthChecker, DivergenceReport } from './src/services/TruthChecker';
+import { DebrisPredictor } from './src/services/DebrisPredictor';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
-import type { FeatureCollection, Point } from 'geojson';
+import type { FeatureCollection, Point, LineString } from 'geojson';
 
 import { RemoteConfig } from './src/services/RemoteConfig';
 
@@ -49,6 +50,7 @@ export default function App() {
   const [acknowledgedAlerts, setAcknowledgedAlerts] = useState<Set<string>>(new Set());
   const [consensusMap, setConsensusMap] = useState<Map<string, ConsensusData>>(new Map());
   const [lastDivergence, setLastDivergence] = useState<DivergenceReport | null>(null);
+  const [debrisPaths, setDebrisPaths] = useState<FeatureCollection<LineString> | undefined>(undefined);
 
   const skBridge = useRef(new SignalKBridge());
   const patternMatcherRef = useRef<PatternMatcher | null>(null);
@@ -56,6 +58,7 @@ export default function App() {
   const vesselSnapshotRef = useRef<VesselSnapshot | null>(null);
   const gridSyncRef = useRef<GridSync | null>(null);
   const truthCheckerRef = useRef<TruthChecker | null>(null);
+  const debrisPredictorRef = useRef<DebrisPredictor | null>(null);
   const dbRef = useRef<DB | null>(null);
   const lastTelemetryRef = useRef<TelemetrySnapshot | null>(null);
   const activeSeedRef = useRef<any>(null); // Ref to current seed from manager
@@ -71,12 +74,12 @@ export default function App() {
   }, [seedManager.activeSeed]);
 
   const initializeServices = useCallback(async () => {
+    let driftInterval: NodeJS.Timeout | null = null;
     try {
       // 0. Initialize Remote Config
       await RemoteConfig.getInstance().initialize();
 
       // 1. Initialize op-sqlite (Synchronous JSI)
-      // Extension loading is handled automatically via package.json config
       console.log('[App] Initializing op-sqlite (Zero Latency)...');
       const db = open({ name: 'mariners_grid.db' });
       dbRef.current = db;
@@ -98,6 +101,24 @@ export default function App() {
       // Initialize TruthChecker
       const truthChecker = new TruthChecker(vesselSnapshot, vecDb);
       truthCheckerRef.current = truthChecker;
+
+      // Initialize DebrisPredictor
+      const debrisPredictor = new DebrisPredictor(db, hazardService);
+      debrisPredictorRef.current = debrisPredictor;
+      
+      // Initial forecast run
+      await debrisPredictor.forecastDrift().catch(e => console.warn('[App] Initial drift forecast failed:', e));
+      const initialPaths = await debrisPredictor.getPredictedPathsGeoJSON();
+      setDebrisPaths(initialPaths);
+
+      // Periodic drift update
+      driftInterval = setInterval(async () => {
+        if (debrisPredictorRef.current) {
+          await debrisPredictorRef.current.forecastDrift();
+          const paths = await debrisPredictorRef.current.getPredictedPathsGeoJSON();
+          setDebrisPaths(paths);
+        }
+      }, 15 * 60 * 1000);
 
       // Initialize GridSync
       const gridSync = new GridSync(db, vesselSnapshot, vecDb);
@@ -174,8 +195,6 @@ export default function App() {
 
             if (report.isDivergent) {
               console.log(`[App] AI Grid Divergence Level: ${report.level}`);
-              // Trigger a synthetic alert for divergence if not already handled
-              // In production, this would be a specialized 'DivergenceAlert' component
             }
           }
         }
@@ -184,7 +203,10 @@ export default function App() {
     } catch (error) {
       console.error('[App] Failed to initialize services:', error);
     }
-  }, [acknowledgedAlerts]);
+    return () => {
+      if (driftInterval) clearInterval(driftInterval);
+    };
+  }, [acknowledgedAlerts, identity?.deviceId, seedManager]);
 
   useEffect(() => {
     async function checkFirstWatch() {
@@ -254,6 +276,7 @@ export default function App() {
             vesselLocation={vesselLocation}
             forecastData={seedManager.windGeoJSON || forecastData}
             waveData={seedManager.waveGeoJSON || undefined}
+            debrisPaths={debrisPaths}
             onReportHazard={(loc) => {
               setReportLocation(loc);
               setReportingVisible(true);

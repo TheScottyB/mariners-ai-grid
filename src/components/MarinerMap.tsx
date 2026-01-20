@@ -15,11 +15,13 @@ import Mapbox, {
   Camera,
   ShapeSource,
   SymbolLayer,
+  LineLayer,
   PointAnnotation,
   UserLocation,
+  Images,
 } from '@rnmapbox/maps';
 import { useSQLiteContext } from '../../App';
-import type { FeatureCollection, Point } from 'geojson';
+import type { FeatureCollection, Point, LineString } from 'geojson';
 
 import {
   hazardsToGeoJSON,
@@ -47,6 +49,8 @@ export interface MarinerMapProps {
   forecastData?: FeatureCollection<Point>;
   /** GeoJSON FeatureCollection of wave data */
   waveData?: FeatureCollection<Point>;
+  /** GeoJSON FeatureCollection of predicted debris paths */
+  debrisPaths?: FeatureCollection<LineString>;
   /** Current vessel position from Signal K bridge */
   vesselLocation: VesselLocation;
   /** Search radius for hazards in nautical miles */
@@ -62,6 +66,7 @@ export interface MarinerMapProps {
 export const MarinerMap: React.FC<MarinerMapProps> = ({
   forecastData,
   waveData,
+  debrisPaths,
   vesselLocation,
   hazardSearchRadiusNm = 50,
   onHazardPress,
@@ -257,6 +262,21 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
                 iconSize: ['get', 'iconSize'],
                 iconOpacity: 0.6,
                 iconAllowOverlap: false,
+              }}
+            />
+          </ShapeSource>
+        )}
+
+        {/* 1.6. Predicted Debris Paths (Lagrangian Drift) */}
+        {debrisPaths && debrisPaths.features.length > 0 && (
+          <ShapeSource id="debrisPathSource" shape={debrisPaths}>
+            <LineLayer
+              id="debrisPathLines"
+              style={{
+                lineColor: '#FFD700', // Gold for predicted paths
+                lineOpacity: 0.4,
+                lineWidth: 2,
+                lineDasharray: [2, 2],
               }}
             />
           </ShapeSource>

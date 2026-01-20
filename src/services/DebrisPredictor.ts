@@ -17,6 +17,7 @@
 
 import { DB } from '@op-engineering/op-sqlite';
 import { HazardService, HazardType } from './HazardService';
+import { FeatureCollection, LineString } from 'geojson';
 
 export interface DriftVector {
   u: number; // Eastward velocity (m/s)
@@ -31,13 +32,13 @@ export interface PredictedPathPoint {
 
 /**
  * Debris coefficients for Lagrangian Drift
- * Based on maritime standards for floating objects.
+ * Based on maritime standards for floating objects (2026 Refined).
  */
 const DEBRIS_COEFFICIENTS: Record<string, { leeway: number; drag: number }> = {
-  'debris': { leeway: 0.03, drag: 1.0 },      // Standard 3% rule
-  'fishing_gear': { leeway: 0.02, drag: 1.2 }, // Low profile, high drag
-  'whale': { leeway: 0.01, drag: 0.8 },        // Moving, low wind impact
-  'other': { leeway: 0.02, drag: 1.0 },        // Default
+  'debris': { leeway: 0.015, drag: 1.0 },      // Logs/Timber: ~1.5% leeway
+  'fishing_gear': { leeway: 0.03, drag: 1.1 }, // Seaweed/Nets: ~3% leeway
+  'whale': { leeway: 0.01, drag: 0.9 },        // Moving mammal: low wind impact
+  'other': { leeway: 0.05, drag: 0.7 },        // Containers/High Freeboard: ~5% leeway
 };
 
 export class DebrisPredictor {
@@ -50,10 +51,10 @@ export class DebrisPredictor {
   }
 
   /**
-   * Predict future positions for all drifting hazards in 6-hour increments.
+   * Predict future positions for all drifting hazards in 1-hour increments.
    * Stores the full predicted path (24h window) in the database.
    */
-  async forecastDrift(forecastHours: number = 24, stepHours: number = 6): Promise<number> {
+  async forecastDrift(forecastHours: number = 24, stepHours: number = 1): Promise<number> {
     const now = Date.now();
     const driftingTypes: HazardType[] = ['debris', 'whale', 'fishing_gear'];
     
@@ -107,6 +108,44 @@ export class DebrisPredictor {
     }
 
     return updatedCount;
+  }
+
+  /**
+   * Returns a GeoJSON FeatureCollection of LineStrings representing 
+   * the predicted paths of all drifting hazards.
+   */
+  async getPredictedPathsGeoJSON(): Promise<FeatureCollection<LineString>> {
+    const now = Date.now();
+    const result = await this.db.execute(
+      `SELECT id, type, predicted_path_json FROM marine_hazards 
+       WHERE predicted_path_json IS NOT NULL AND expires_at > ?`,
+      [now]
+    );
+
+    const rows = result.rows || [];
+    const features: any[] = [];
+
+    for (const row of rows) {
+      const path: PredictedPathPoint[] = JSON.parse(row.predicted_path_json as string);
+      if (path.length < 2) continue;
+
+      features.push({
+        type: 'Feature',
+        properties: {
+          id: row.id,
+          type: row.type,
+        },
+        geometry: {
+          type: 'LineString',
+          coordinates: path.map(p => [p.lon, p.lat]),
+        },
+      });
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features,
+    };
   }
 
   /**
