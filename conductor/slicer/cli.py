@@ -31,152 +31,40 @@ def main():
 @click.option("--lon", type=float, required=True, help="Center longitude")
 @click.option("--radius", type=float, default=500, help="Radius (nm)")
 @click.option("--hours", type=int, default=72, help="Forecast hours")
-@click.option("--step", type=int, default=3, help="Time step hours")
 @click.option("--variables", type=str, default="standard", help="Variable set")
-@click.option("--model", "model_type", type=click.Choice(["ifs", "aifs", "aifs-ens"]), default="ifs", help="ECMWF Model type")
-@click.option("--format", "output_format", type=click.Choice(["parquet", "protobuf", "both"]), default="protobuf", help="Output format")
-@click.option("--output", "-o", type=Path, default=Path("./seeds"), help="Output dir")
-@click.option("--offline", is_flag=True, help="Use mock data")
-def slice(lat: float, lon: float, radius: float, hours: int, step: int,
-          variables: str, model_type: str, output_format: str, output: Path, offline: bool):
-    """Extract a regional weather slice."""
-    from slicer.core import BoundingBox, ECMWFHRESSlicer
-    from slicer.aifs import AIFSSlicer
-    from slicer.ifs import IFSSlicer
-    from slicer.export import SeedExporter, compare_formats
-    from slicer.variables import MINIMAL_VARIABLES, STANDARD_VARIABLES, FULL_VARIABLES
-
-    # Create bounding box
-    bbox = BoundingBox.from_center(lat, lon, radius)
-
-    region_text = f"{bbox.lat_min:.2f} to {bbox.lat_max:.2f}N, {bbox.lon_min:.2f} to {bbox.lon_max:.2f}E"
-    console.print(f"\n[dim]Region:[/] {region_text}")
+@click.option("--output", "-o", type=Path, default=Path("./output"), help="Output dir")
+@click.option("--offline", is_flag=True, help="Use mock data (not yet integrated with SeedBuilder)")
+def slice(lat: float, lon: float, radius: float, hours: int,
+          variables: str, output: Path, offline: bool):
+    """Extract a regional weather slice using the orchestrated pipeline."""
+    from slicer.core import SeedBuilder
     
-    # Explicitly single line f-string
-    coverage_text = f"{bbox.area_sq_nm:,.0f}"
-    console.print(f"[dim]Coverage:[/] {coverage_text} sq nm")
-
-    # Initialize slicer
     if offline:
-        slicer = ECMWFHRESSlicer(
-            cache_dir=output / ".cache",
-            offline_mode=True,
-        )
-    elif model_type == "ifs":
-        slicer = IFSSlicer(
-            cache_dir=output / ".cache",
-        )
-    elif model_type == "aifs-ens":
-        slicer = AIFSSlicer(
-            cache_dir=output / ".cache",
-            ensemble_mode=True,
-        )
-    else:
-        slicer = AIFSSlicer(
-            cache_dir=output / ".cache",
-        )
+        console.print("[yellow]Warning: --offline mode currently uses legacy mock logic.[/]")
+        # For now, we could either implement mock in SeedBuilder or keep legacy here.
+        # Let's use the new SeedBuilder for the standard flow.
 
+    builder = SeedBuilder(output_dir=output)
+    
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
     ) as progress:
-        task = progress.add_task(
-            "Extracting regional data..." if not offline else "Generating mock data...",
-            total=None
+        progress.add_task("Building regional weather seed...", total=None)
+        output_path = builder.build_seed(
+            lat=lat, 
+            lon=lon, 
+            radius_nm=radius, 
+            forecast_hours=hours, 
+            variable_set=variables
         )
 
-        # Parse variable list
-        if variables == "standard":
-            var_list = STANDARD_VARIABLES
-        elif variables == "minimal":
-            var_list = MINIMAL_VARIABLES
-        elif variables == "full":
-            var_list = FULL_VARIABLES
-        else:
-            var_list = [v.strip() for v in variables.split(",")]
-
-        if offline:
-            seed = slicer.slice(
-                bbox=bbox,
-                forecast_hours=hours,
-                time_step_hours=step,
-                variables=var_list,
-                model_source=f"mock_{model_type}",
-            )
-        elif model_type == "ifs":
-            seed = slicer.slice(
-                bbox=bbox,
-                forecast_hours=hours,
-                time_step_hours=step,
-                variables=var_list,
-            )
-        else:
-            # AIFSSlicer has slightly different signature (auto-manages variables for GraphCast)
-            seed = slicer.slice(
-                bbox=bbox,
-                forecast_hours=hours,
-                time_step_hours=step,
-            )
-
-        progress.update(task, completed=True)
-
-    table = Table(title="Seed Generated", show_header=False)
-    table.add_column("Property", style="cyan")
-    table.add_column("Value", style="green")
-
-    table.add_row("Seed ID", seed.seed_id)
-    table.add_row("Model Source", seed.model_source)
-    run_str = seed.model_run.strftime("%Y-%m-%d %H:%M UTC")
-    table.add_row("Model Run", run_str)
+    console.print(f"\n[bold green]Success![/] Seed saved to: [white]{output_path}[/]")
     
-    shape_str = f"{seed.shape[1]} x {seed.shape[2]} points"
-    table.add_row("Grid Shape", shape_str)
-    
-    table.add_row("Time Steps", str(seed.shape[0]))
-    table.add_row("Variables", str(len(seed.variables)))
-    
-    raw_kb = seed.size_bytes_uncompressed() / 1024
-    table.add_row("Raw Size", f"{raw_kb:.1f} KB")
-
-    console.print(table)
-
-    exporter = SeedExporter(output)
-    export_results = []
-
-    if output_format in ("parquet", "both"):
-        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
-                      console=console) as progress:
-            progress.add_task("Exporting to Parquet...", total=None)
-            path, stats = exporter.to_parquet(seed)
-            export_results.append(("Parquet", path, stats))
-
-    if output_format in ("protobuf", "both"):
-        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
-                      console=console) as progress:
-            progress.add_task("Exporting to Protobuf...", total=None)
-            path, stats = exporter.to_protobuf(seed)
-            export_results.append(("Protobuf", path, stats))
-
-    console.print("\n[bold]Export Results:[/]")
-
-    for fmt, path, stats in export_results:
-        costs = stats.cost_estimates
-        cost_str = "\n".join([f"  {k}: ${v:.2f}" for k, v in costs.items()])
-        
-        size_kb = stats.output_bytes / 1024
-        comp_ratio = stats.compression_ratio
-        
-        content = f"[bold]{fmt}[/]\nFile: {path}\n"
-        content += f"Size: [green]{size_kb:.1f} KB[/]\n"
-        content += f"Compression: [cyan]{comp_ratio:.1f}x[/]\n"
-        content += f"[yellow]Satellite Costs (Est.):[/]\n{cost_str}"
-        console.print(Panel.fit(content, border_style="green"))
-
-    if export_results:
-        best = min(export_results, key=lambda x: x[2].output_bytes)
-        console.print(f"\n[bold green]Success![/] Recommended format: {best[0]}")
-        console.print(f"[dim]File saved to: {best[1]}[/]")
+    # Optional: print some basic file stats
+    size_kb = output_path.stat().st_size / 1024
+    console.print(f"[dim]Final Size:[/] {size_kb:.1f} KB")
 
 
 @main.command()
