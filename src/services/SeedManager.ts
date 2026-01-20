@@ -102,6 +102,9 @@ export class SeedManager {
     if (this.metadataIndex.length === 0) {
       console.log('[SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...');
       try {
+        // Simulate network delay for realism
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
         await this.downloadSeed(
           'https://mariners-ai-grid.s3.amazonaws.com/seeds/pacific_starter_v1.parquet',
           'local'
