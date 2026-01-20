@@ -146,7 +146,7 @@ export class TelemetryService {
           const snapshot: TelemetrySnapshot = {
             position: { lat: location.coords.latitude, lon: location.coords.longitude },
             heading: location.coords.heading || 0,
-            sog: location.coords.speed ? (location.coords.speed * 1.94384) : 0,
+            sog: Math.max(0, location.coords.speed ? (location.coords.speed * 1.94384) : 0),
             timestamp: location.timestamp,
             // Device hardware typically lacks barometer/wind
           };

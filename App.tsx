@@ -19,6 +19,7 @@ import { TruthChecker, DivergenceReport } from './src/services/TruthChecker';
 import { DebrisPredictor } from './src/services/DebrisPredictor';
 import { TelemetryService, TelemetrySource } from './src/services/TelemetryService';
 import { DevMenu } from './src/components/DevMenu';
+import { FAB } from './src/components/FAB';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
@@ -58,6 +59,7 @@ export default function App() {
   const [debrisPaths, setDebrisPaths] = useState<FeatureCollection<LineString> | undefined>(undefined);
   const [telemetrySource, setTelemetrySource] = useState<TelemetrySource>('device');
   const [devMenuVisible, setDevMenuVisible] = useState(false);
+  const [isDownloadingSeed, setIsDownloadingSeed] = useState(false);
 
   const skBridge = useRef(new SignalKBridge());
   const headerTapCount = useRef(0);
@@ -260,6 +262,27 @@ export default function App() {
     }, 500);
   };
 
+  const handleDownloadSeed = async () => {
+    if (isDownloadingSeed) return;
+    setIsDownloadingSeed(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    try {
+      // For MVP Explorer Mode, we fetch the static Pacific/McHenry starter seed
+      await seedManager.downloadSeed(
+        'https://mariners-ai-grid.s3.amazonaws.com/seeds/pacific_starter_v1.parquet'
+      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Seed Downloaded", "New weather data is active.");
+    } catch (e) {
+      console.warn("Seed download failed:", e);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Download Failed", "Check internet connection.");
+    } finally {
+      setIsDownloadingSeed(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -299,12 +322,20 @@ export default function App() {
               setReportingVisible(true);
             }}
             featureFlags={RemoteConfig.getInstance().getAllFlags()}
+            onWarningPress={handleDownloadSeed}
           />
 
           <PatternAlertStack
             alerts={activeAlerts}
             consensusMap={consensusMap}
             onAcknowledge={handleAcknowledgeAlert}
+          />
+          
+          <FAB 
+            icon="⬇️" 
+            label="Fetch Seed" 
+            onPress={handleDownloadSeed} 
+            loading={isDownloadingSeed}
           />
         </View>
 

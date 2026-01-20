@@ -97,6 +97,20 @@ export class SeedManager {
     await this.loadMetadataIndex();
     await this.cleanupExpiredSeeds();
     await this.enforceLRU();
+    
+    // Auto-load "Home Slice" (McHenry/Chicago) if no seeds exist (Explorer Mode MVP)
+    if (this.metadataIndex.length === 0) {
+      console.log('[SeedManager] No seeds found. Fetching "Home Slice" (McHenry/Chicago)...');
+      try {
+        await this.downloadSeed(
+          'https://mariners-ai-grid.s3.amazonaws.com/seeds/pacific_starter_v1.parquet',
+          'local'
+        );
+      } catch (e) {
+        console.warn('[SeedManager] Failed to fetch Home Slice:', e);
+      }
+    }
+
     console.log(`[SeedManager] Initialized with ${this.metadataIndex.length} seeds`);
   }
 

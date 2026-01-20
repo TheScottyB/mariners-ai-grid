@@ -61,6 +61,8 @@ export interface MarinerMapProps {
   onReportHazard?: (location: { lat: number; lng: number }) => void;
   /** Feature flags for UI toggles */
   featureFlags?: FeatureFlags;
+  /** Callback when user taps the data freshness warning banner */
+  onWarningPress?: () => void;
 }
 
 export const MarinerMap: React.FC<MarinerMapProps> = ({
@@ -72,6 +74,7 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
   onHazardPress,
   onReportHazard,
   featureFlags,
+  onWarningPress,
 }) => {
   const mapRef = useRef<MapView>(null);
   const db = useSQLiteContext();
@@ -204,18 +207,20 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
     <View style={styles.container}>
       {/* Data Freshness Warning Banner */}
       {dataFreshness !== 'fresh' && (
-        <View
+        <TouchableOpacity
           style={[
             styles.warningBanner,
             dataFreshness === 'stale' ? styles.warningAmber : styles.warningRed,
           ]}
+          onPress={onWarningPress}
+          activeOpacity={0.8}
         >
           <Text style={styles.warningText}>
             {dataFreshness === 'stale'
-              ? '⚠️ Weather data is 6-12 hours old'
-              : '🔴 Weather data expired - seek fresh download'}
+              ? '⚠️ Weather data is 6-12 hours old (Tap to Refresh)'
+              : '🔴 Weather data expired - Tap to Download Seed'}
           </Text>
-        </View>
+        </TouchableOpacity>
       )}
 
       {/* Power Save Mode Indicator */}
