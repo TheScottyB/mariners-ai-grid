@@ -23,7 +23,7 @@
     - [ ] Sub-task: Define `QuantizationConfig` schema/class.
     - [ ] Sub-task: Implement `Quantizer` class to apply 0.5kt / 5-degree rounding to specific variables.
     - [ ] Sub-task: Verify quantization does not break data structure (unit tests).
-- [ ] Task: Implement Parquet Serialization
+- [x] Task: Implement Parquet Serialization 5b40261
     - [ ] Sub-task: Write tests for `ParquetSerializer` (input: xarray; output: .parquet bytes).
     - [ ] Sub-task: Implement `ParquetSerializer` using efficient dictionary encoding options.
     - [ ] Sub-task: Benchmark output size against the 2.5MB target.
