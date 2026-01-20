@@ -11,7 +11,7 @@ Mariner’s AI Grid is an open-source, agentic weather platform built for the **
 ## Core Value Proposition
 1.  **Tactical Accuracy:** Delivers higher-resolution, AI-driven local forecasts that outperform generic global models. It achieves this by incorporating real-time on-board sensor data to fine-tune the local inference.
 2.  **Offline Sovereignty:** Ensures that critical weather data and AI inference capabilities remain fully functional even when satellite connections fail. The system is built to survive offline, with data stored locally and inference running on the device's hardware.
-3.  **Extreme Data Efficiency:** Drastically reduces satellite bandwidth costs (by ~95%) compared to traditional GRIB downloads through the "Cloud Slicer" architecture.
+3.  **Extreme Data Efficiency:** Drastically reduces satellite bandwidth costs (by ~95%) compared to traditional GRIB downloads through the "Cloud Slicer" architecture and precision-quantized Parquet seeds.
 
 ## Key Features (MVP)
 ### 1. On-Device AI Inference

@@ -18,7 +18,7 @@
 - **Access Pattern:** Synchronous JSI (JavaScript Interface) for zero-latency vector search.
 - **Serialization:**
     -   **Protobuf (`.proto`):** Structured data.
-    -   **Parquet:** Gridded weather data (superior dictionary encoding).
+    -   **Parquet:** Gridded weather data (superior dictionary encoding + precision quantization).
 
 ## Development Tools
 - **Package Manager:** `pnpm` (JavaScript), `uv` (Python).
