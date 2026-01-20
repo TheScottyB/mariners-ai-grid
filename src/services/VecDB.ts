@@ -269,9 +269,10 @@ export class VecDB {
        JOIN atmospheric_patterns p ON v.id = p.id
        WHERE p.lat BETWEEN ? AND ?
          AND p.lon BETWEEN ? AND ?
+         AND v.embedding MATCH vec_f32(?)
+         AND k = ?
          AND vec_distance_cosine(v.embedding, vec_f32(?)) < ?
-       ORDER BY distance ASC
-       LIMIT ?`,
+       ORDER BY distance ASC`,
       [
         embedding,
         centerLat - radiusDegrees,
@@ -279,8 +280,9 @@ export class VecDB {
         centerLon - radiusDegrees,
         centerLon + radiusDegrees,
         embedding,
-        1 - minSimilarity,
         limit,
+        embedding,
+        1 - minSimilarity,
       ]
     );
 
@@ -361,8 +363,8 @@ export class VecDB {
       params.push(`%${outcomeFilter}%`);
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    params.push(embedding, limit);
+    const whereClause = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
+    params.push(limit, embedding, 0.4); // minSimilarity threshold for vibe search
 
     const query = `
       SELECT
@@ -376,9 +378,11 @@ export class VecDB {
         p.source
       FROM atmospheric_vectors v
       JOIN atmospheric_patterns p ON v.id = p.id
-      ${whereClause}
+      WHERE v.embedding MATCH vec_f32(?)
+        AND k = ?
+        ${whereClause}
+        AND vec_distance_cosine(v.embedding, vec_f32(?)) < ?
       ORDER BY distance ASC
-      LIMIT ?
     `;
 
     // Note: op-sqlite handles the param ordering in execute
