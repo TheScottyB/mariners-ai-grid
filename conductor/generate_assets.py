@@ -172,7 +172,7 @@ def generate_splash_screen():
         text_w = bbox[2] - bbox[0]
         draw.text((cx - text_w//2, cy + 200), text, fill=PALETTE['text_white'], font=font)
         
-        text2 = "WAZE FOR SAILORS"
+        text2 = "WAZE FOR MARINERS"
         font2 = font.font_variant(size=40) if hasattr(font, 'font_variant') else font
         bbox2 = draw.textbbox((0,0), text2, font=font2)
         text_w2 = bbox2[2] - bbox2[0]

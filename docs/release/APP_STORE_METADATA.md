@@ -6,7 +6,7 @@
 
 ### **1. App Identity**
 
-*   **App Name (30 chars):** Mariner’s AI: Waze for Sailors
+*   **App Name (30 chars):** Mariner’s AI: Waze for Mariners
 *   **Subtitle (30 chars):** AI Weather & Social Hazards
 *   **Primary Category:** Weather
 *   **Secondary Category:** Navigation

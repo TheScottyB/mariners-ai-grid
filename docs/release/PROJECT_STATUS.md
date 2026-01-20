@@ -6,7 +6,7 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 ---
 
 ## 1. App Identity & Vision
-*   **Name:** Mariner’s AI: Waze for Sailors
+*   **Name:** Mariner’s AI: Waze for Mariners
 *   **Core Promise:** "The Waze of the Ocean. Run GraphCast AI locally. Real-time boat crowdsourcing."
 *   **Mission:** Democratize safety-critical weather intelligence by bridging the high-bandwidth cloud and low-bandwidth boat using local AI.
 *   **Key Differentiator:** Proprietary "Slicer" technology (10GB global → 5MB local seed) and offline-first "Agentic AI."

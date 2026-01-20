@@ -1,6 +1,6 @@
 /**
  * Mariner's AI Grid - Social Layer
- * Implements "Waze for Sailors" using vector-based hazard search.
+ * Implements "Waze for Mariners" using vector-based hazard search.
  */
 
 import { DB } from '@op-engineering/op-sqlite';

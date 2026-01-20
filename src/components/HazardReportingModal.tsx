@@ -1,6 +1,6 @@
 /**
  * Mariner's AI Grid - Hazard Reporting Modal
- * Part of the "Waze for Sailors" social layer.
+ * Part of the "Waze for Mariners" social layer.
  * Allows users to submit crowdsourced reports for debris, whales, etc.
  */
 
