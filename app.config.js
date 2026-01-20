@@ -126,6 +126,11 @@ export default ({ config }) => {
       },
       signalKUrl: process.env.EXPO_PUBLIC_SIGNALK_URL || (IS_DEV ? "ws://localhost:3000/signalk/v1/stream" : "ws://signalk.local:3000/signalk/v1/stream"),
       gridApiUrl: process.env.EXPO_PUBLIC_GRID_API_URL || (IS_DEV ? "http://localhost:3001" : "https://api.marinersai.grid"),
+      featureFlags: {
+        nightWatch: false,
+        socialReporting: true,
+        experimentalSlicer: false
+      }
     }
   };
 };

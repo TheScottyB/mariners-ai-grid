@@ -16,6 +16,7 @@
 
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as SecureStore from 'expo-secure-store';
 import { DB } from '@op-engineering/op-sqlite';
 import { TelemetrySnapshot } from './PatternMatcher';
 import { AtmosphericVector } from './VecDB';

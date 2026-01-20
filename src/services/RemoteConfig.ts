@@ -1,10 +1,4 @@
-
-/**
- * Mariner's AI Grid - Remote Config Service
- * 
- * Manages feature flags for staged rollouts.
- * In a real deployment, this would fetch from a backend or EAS Update extras.
- */
+import Constants from 'expo-constants';
 
 // Conditional import to avoid module not found errors in dev
 let Updates: any = null;
@@ -43,23 +37,31 @@ export class RemoteConfig {
    * Initialize and fetch remote configuration.
    * Logic:
    * 1. Check EAS Update "extra" field (for OTA updates)
-   * 2. Fallback to defaults
+   * 2. Check Constants.expoConfig "extra" (for base build)
+   * 3. Fallback to defaults
    */
   async initialize(): Promise<void> {
     try {
       console.log('[RemoteConfig] Initializing...');
       
-      // Check if we are running from an EAS Update
-      // In SDK 54, manifest is accessed differently, but for simplicity we stick to defaults for MVP
-      // or check channel.
-      
-      // Simulate remote fetch
-      if (Updates && Updates.channel && (Updates.channel === 'preview' || Updates.channel === 'production')) {
-          // Could pull from a static JSON endpoint here
+      // 1. Start with hardcoded defaults
+      let mergedFlags = { ...DEFAULT_FLAGS };
+
+      // 2. Override with base build config if present
+      const configFlags = Constants.expoConfig?.extra?.featureFlags;
+      if (configFlags) {
+        mergedFlags = { ...mergedFlags, ...configFlags };
+        console.log('[RemoteConfig] Base flags loaded from app.config.js');
+      }
+
+      // 3. Override with dynamic EAS Update extras if present
+      if (Updates && Updates.extra && Updates.extra.featureFlags) {
+        mergedFlags = { ...mergedFlags, ...Updates.extra.featureFlags };
+        console.log('[RemoteConfig] Overrides loaded from EAS Update');
       }
       
-      // For now, we stick to hardcoded defaults which are safe for offline-first
-      console.log('[RemoteConfig] Flags loaded:', this.flags);
+      this.flags = mergedFlags;
+      console.log('[RemoteConfig] Active Flags:', this.flags);
       
     } catch (error) {
       console.warn('[RemoteConfig] Failed to load config, using defaults:', error);

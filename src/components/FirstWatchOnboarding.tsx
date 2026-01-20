@@ -959,7 +959,7 @@ export const FirstWatchOnboarding: React.FC<FirstWatchOnboardingProps> = ({
   const handleComplete = useCallback(async () => {
     await SecureStore.setItemAsync(ONBOARDING_COMPLETE_KEY, 'true');
 
-    trackEvent(ANALYTICS_EVENTS.ONBOARDING_COMPLETE, {
+    await trackEvent(ANALYTICS_EVENTS.ONBOARDING_COMPLETE, {
       totalTime: Date.now() - onboardingStartTime.current,
       bridgeStatus: milestoneStatus.bridge,
       seedStatus: milestoneStatus.seed,
@@ -967,6 +967,7 @@ export const FirstWatchOnboarding: React.FC<FirstWatchOnboardingProps> = ({
       codeStatus: milestoneStatus.code,
     });
 
+    console.log('⚓ First Watch Complete - Analytics Triggered');
     onComplete();
   }, [onComplete, milestoneStatus]);
 

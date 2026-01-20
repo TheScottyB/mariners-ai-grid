@@ -8,15 +8,29 @@
 
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 // Configuration
 const SEED_DIR = path.join(__dirname, '../conductor/demo_seeds');
 const CLOUD_ENDPOINT = process.env.MAG_CLOUD_URL || 'https://api.mariners.ai/upload/seed';
 const API_KEY = process.env.MAG_API_KEY || 'dev_key';
+const ATTESTATION_SECRET = process.env.MAG_ATTESTATION_SECRET || 'sovereign_secret_2026';
+
+/**
+ * Generates a HMAC-SHA256 attestation token for the payload.
+ * In a production Conductor, this would use a hardware security module (HSM).
+ */
+function generateAttestation(payload: Buffer): string {
+  return crypto
+    .createHmac('sha256', ATTESTATION_SECRET)
+    .update(payload)
+    .digest('hex');
+}
 
 async function uploadSeeds() {
   console.log('⚓ Mariner\'s AI Seed Uploader');
   console.log(`Scanning: ${SEED_DIR}`);
+  console.log(`Attestation Mode: HMAC-SHA256 (Hardened)\n`);
 
   if (!fs.existsSync(SEED_DIR)) {
     console.error(`Error: Seed directory not found: ${SEED_DIR}`);
@@ -37,18 +51,23 @@ async function uploadSeeds() {
     const stats = fs.statSync(filePath);
     const sizeMb = (stats.size / (1024 * 1024)).toFixed(2);
 
-    console.log(`Uploading ${file} (${sizeMb} MB)...`);
+    console.log(`Processing ${file} (${sizeMb} MB)...`);
 
     try {
       const fileBuffer = fs.readFileSync(filePath);
       
+      // 1. Generate Attestation Token
+      const attestation = generateAttestation(fileBuffer);
+      console.log(`   Attestation: ${attestation.slice(0, 12)}...`);
+
       // In a real scenario, use AWS S3 SDK or multipart upload
-      // For prototype, we mock a POST request
+      // For prototype, we mock a POST request with attestation headers
       /*
       const response = await fetch(CLOUD_ENDPOINT, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${API_KEY}`,
+          'X-Mag-Attestation': attestation,
           'Content-Type': 'application/octet-stream',
           'X-Seed-Filename': file
         },
