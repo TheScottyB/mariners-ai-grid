@@ -18,16 +18,16 @@
     - [x] Sub-task: Implement `VariablePruner` to filter for Wind (U/V), Pressure (MSL), and Waves.
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Core Slicing Logic' (Protocol in workflow.md)
 
-## Phase 3: Quantization & Parquet Export
+## Phase 3: Quantization & Parquet Export [checkpoint: eebb027]
 - [x] Task: Implement Quantization Strategy d860c7d
-    - [ ] Sub-task: Define `QuantizationConfig` schema/class.
-    - [ ] Sub-task: Implement `Quantizer` class to apply 0.5kt / 5-degree rounding to specific variables.
-    - [ ] Sub-task: Verify quantization does not break data structure (unit tests).
+    - [x] Sub-task: Define `QuantizationConfig` schema/class.
+    - [x] Sub-task: Implement `Quantizer` class to apply 0.5kt / 5-degree rounding to specific variables.
+    - [x] Sub-task: Verify quantization does not break data structure (unit tests).
 - [x] Task: Implement Parquet Serialization 5b40261
-    - [ ] Sub-task: Write tests for `ParquetSerializer` (input: xarray; output: .parquet bytes).
-    - [ ] Sub-task: Implement `ParquetSerializer` using efficient dictionary encoding options.
-    - [ ] Sub-task: Benchmark output size against the 2.5MB target.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Quantization & Parquet Export' (Protocol in workflow.md)
+    - [x] Sub-task: Write tests for `ParquetSerializer` (input: xarray; output: .parquet bytes).
+    - [x] Sub-task: Implement `ParquetSerializer` using efficient dictionary encoding options.
+    - [x] Sub-task: Benchmark output size against the 2.5MB target.
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Quantization & Parquet Export' (Protocol in workflow.md)
 
 ## Phase 4: Integration & Pipeline
 - [ ] Task: Build `SeedBuilder` Orchestrator
