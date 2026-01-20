@@ -30,7 +30,7 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 3: Quantization & Parquet Export' (Protocol in workflow.md)
 
 ## Phase 4: Integration & Pipeline
-- [ ] Task: Build `SeedBuilder` Orchestrator
+- [x] Task: Build `SeedBuilder` Orchestrator 40dc057
     - [ ] Sub-task: Implement the main pipeline class connecting Fetch -> Slice -> Prune -> Quantize -> Serialize.
     - [ ] Sub-task: Create a CLI entry point (e.g., `python -m conductor.slicer slice --lat ... --lon ...`) to run the pipeline.
 - [ ] Task: End-to-End Validation
