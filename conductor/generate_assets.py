@@ -239,7 +239,20 @@ def generate_liquid_glass_icon():
     with open(os.path.join(ASSETS_DIR, "app.icon", "Contents.json"), "w") as f:
         json.dump(contents, f, indent=2)
     
-    print(f"Generated Liquid Glass Icon layers in {layer_dir}")
+    # 5. Variants (Flattened versions for legacy systems/fallbacks)
+    variant_dir = os.path.join(ASSETS_DIR, "app.icon", "variants")
+    ensure_dir(variant_dir)
+    
+    # Create flattened version for variants
+    flat = bg.copy()
+    flat.paste(mid, (0,0), mid)
+    flat.paste(fg, (0,0), fg)
+    
+    for size_px in [1024, 512, 180]:
+        variant = flat.resize((size_px, size_px), Image.Resampling.LANCZOS)
+        variant.save(os.path.join(variant_dir, f"{size_px}.png"))
+    
+    print(f"Generated Liquid Glass Icon layers and variants in {os.path.join(ASSETS_DIR, 'app.icon')}")
 
 def generate_marketing_screenshots():
     # iPhone 16 Pro Max dimensions approx 1290 x 2796
