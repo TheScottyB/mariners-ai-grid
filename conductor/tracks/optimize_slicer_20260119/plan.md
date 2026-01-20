@@ -32,7 +32,7 @@
 ## Phase 4: Integration & Pipeline
 - [x] Task: Build `SeedBuilder` Orchestrator 40dc057
     - [ ] Sub-task: Implement the main pipeline class connecting Fetch -> Slice -> Prune -> Quantize -> Serialize.
-    - [ ] Sub-task: Create a CLI entry point (e.g., `python -m conductor.slicer slice --lat ... --lon ...`) to run the pipeline.
+    - [x] Task: Create a CLI entry point cdabfd5
 - [ ] Task: End-to-End Validation
     - [ ] Sub-task: Run the pipeline on the sample GRIB2 file.
     - [ ] Sub-task: Verify the output "Seed" can be read back and contains correct data values (fidelity check).
