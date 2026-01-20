@@ -17,6 +17,7 @@ import { GridSync } from './src/services/GridSync';
 import { HazardService } from './src/services/HazardService';
 import { TruthChecker, DivergenceReport } from './src/services/TruthChecker';
 import { DebrisPredictor } from './src/services/DebrisPredictor';
+import { TelemetryService, TelemetrySource } from './src/services/TelemetryService';
 import FirstWatchOnboarding, { isOnboardingComplete } from './src/components/FirstWatchOnboarding';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';

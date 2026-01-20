@@ -192,7 +192,7 @@ export class SignalKBridge {
     }, 10000);
   }
 
-  private processDelta(delta: any) {
+  public processDelta(delta: any) {
     if (!delta.updates) return;
     this.currentTelemetry.timestamp = Date.now();
 
@@ -244,11 +244,11 @@ export class SignalKBridge {
     }
   }
 
-  private hasSufficientTelemetry(): boolean {
+  public hasSufficientTelemetry(): boolean {
     return !!(this.currentTelemetry.position && this.currentTelemetry.barometer);
   }
 
-  private emitTelemetrySnapshot() {
+  public emitTelemetrySnapshot() {
     if (!this.onTelemetrySnapshot) return;
     
     const now = Date.now();

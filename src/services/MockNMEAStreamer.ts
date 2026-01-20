@@ -100,4 +100,35 @@ export class MockNMEAStreamer {
       }
     };
   }
+
+  /**
+   * Predefined Scenario: Winter Storm (Illinois Scenario)
+   * Simulates a deep low pressure system moving through.
+   * 1013 -> 985 hPa over 2 hours.
+   */
+  static WINTER_STORM_SCENARIO(lat: number, lon: number): MockScenario {
+    return {
+      name: 'Winter Storm',
+      durationMs: 7200000, // 2 hours
+      updateIntervalMs: 2000, // 0.5Hz
+      generateDelta: (elapsed) => {
+        const progress = elapsed / 7200000;
+        const pressure = 1013 - (28 * progress); // 1013 -> 985 hPa
+        const windSpeed = 5 + (45 * progress);   // 5 -> 50 knots
+        
+        return {
+          updates: [{
+            source: { label: 'simulated-winter-sensor' },
+            timestamp: new Date().toISOString(),
+            values: [
+              { path: 'navigation.position', value: { latitude: lat, longitude: lon } },
+              { path: 'environment.outside.pressure', value: pressure * 100 },
+              { path: 'environment.wind.speedTrue', value: windSpeed / 1.94384 },
+              { path: 'environment.wind.angleTrueGround', value: 2.1 }, // SW Wind
+            ]
+          }]
+        };
+      }
+    };
+  }
 }
