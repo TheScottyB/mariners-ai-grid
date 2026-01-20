@@ -48,7 +48,7 @@ describe('DebrisPredictor Lagrangian Logic', () => {
       );
 
       // Extract the JSON path from the call
-      const updateCall = mockDb.execute.mock.calls.find(c => c[0].includes('predicted_path_json'));
+      const updateCall = mockDb.execute.mock.calls.find((c: any) => c[0].includes('predicted_path_json'));
       const path = JSON.parse(updateCall[1][0]);
       
       expect(path).toHaveLength(24);
@@ -65,7 +65,7 @@ describe('DebrisPredictor Lagrangian Logic', () => {
 
       await predictor.forecastDrift(1, 1);
 
-      const updateCalls = mockDb.execute.mock.calls.filter(c => c[0].includes('predicted_path_json'));
+      const updateCalls = mockDb.execute.mock.calls.filter((c: any) => c[0].includes('predicted_path_json'));
       
       const containerPath = JSON.parse(updateCalls[0][1][0]);
       const whalePath = JSON.parse(updateCalls[1][1][0]);

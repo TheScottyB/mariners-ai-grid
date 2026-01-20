@@ -54,6 +54,7 @@ export default function App() {
   const [consensusMap, setConsensusMap] = useState<Map<string, ConsensusData>>(new Map());
   const [lastDivergence, setLastDivergence] = useState<DivergenceReport | null>(null);
   const [debrisPaths, setDebrisPaths] = useState<FeatureCollection<LineString> | undefined>(undefined);
+  const [telemetrySource, setTelemetrySource] = useState<TelemetrySource>('device');
 
   const skBridge = useRef(new SignalKBridge());
   const patternMatcherRef = useRef<PatternMatcher | null>(null);
@@ -62,6 +63,7 @@ export default function App() {
   const gridSyncRef = useRef<GridSync | null>(null);
   const truthCheckerRef = useRef<TruthChecker | null>(null);
   const debrisPredictorRef = useRef<DebrisPredictor | null>(null);
+  const telemetryServiceRef = useRef<TelemetryService | null>(null);
   const dbRef = useRef<DB | null>(null);
   const lastTelemetryRef = useRef<TelemetrySnapshot | null>(null);
   const activeSeedRef = useRef<any>(null); // Ref to current seed from manager
@@ -129,59 +131,27 @@ export default function App() {
       await gridSync.registerBackgroundSync().catch(e => console.warn('[App] Background sync registration failed:', e));
       gridSyncRef.current = gridSync;
 
-      // Connect Signal K (Mock simulation by default in bridge)
-      skBridge.current.connect((delta) => {
-        if (delta.updates) {
-          delta.updates.forEach((update: any) => {
-            update.values.forEach((val: any) => {
-              if (val.path === 'navigation.position') {
-                setVesselLocation(prev => ({
-                  ...prev,
-                  lat: val.value.latitude,
-                  lng: val.value.longitude,
-                  timestamp: Date.now(),
-                }));
-              }
-            });
-          });
-        }
-      });
+      // Initialize TelemetryService
+      const telemetryService = TelemetryService.getInstance(skBridge.current);
+      await telemetryService.initialize();
+      telemetryServiceRef.current = telemetryService;
+      setTelemetrySource(telemetryService.getSource());
 
-      // Initialize Pattern Matcher
-      const matcher = new PatternMatcher(db);
-      await matcher.initialize();
-      matcher.start(async (alert) => {
-        if (acknowledgedAlerts.has(alert.id)) return;
+      // Replace direct Signal K listeners with TelemetryService listeners
+      telemetryService.onTelemetry(async (snapshot) => {
+        // Update vessel location for map
+        setVesselLocation({
+          lat: snapshot.position.lat,
+          lng: snapshot.position.lon,
+          heading: snapshot.heading,
+          sog: snapshot.sog,
+          timestamp: snapshot.timestamp,
+        });
 
-        // Generate Consensus Data using Vector DB Vibe Search
-        if (vecDbRef.current) {
-          try {
-            const similar = await vecDbRef.current.vibeSearch(alert.currentConditions, { limit: 5 });
-            const consensusData: ConsensusData = {
-              localMatch: {
-                patternId: alert.matchedPattern.id,
-                label: alert.matchedPattern.label || 'Unknown Pattern',
-                similarity: alert.matchedPattern.similarity,
-                outcome: alert.matchedPattern.outcome || 'Uncertain Outcome',
-              },
-              vibeSearchResults: similar,
-            };
-            setConsensusMap(prev => new Map(prev).set(alert.id, consensusData));
-          } catch (e) {
-            console.warn('[App] Consensus generation failed:', e);
-          }
-        }
-
-        setActiveAlerts(prev => [alert, ...prev.filter(a => a.id !== alert.id)]);
-      }, (conditions) => {
-        // console.log('[App] Conditions Updated:', conditions);
-      });
-      patternMatcherRef.current = matcher;
-
-      // Connect bridge telemetry to matcher
-      skBridge.current.onTelemetry(async (snapshot) => {
         // 1. Process for pattern matching (alerts)
-        matcher.processTelemetry(snapshot);
+        if (patternMatcherRef.current) {
+          patternMatcherRef.current.processTelemetry(snapshot);
+        }
         lastTelemetryRef.current = snapshot;
 
         // 2. Process for Truth Checking (divergence detection)
@@ -203,6 +173,11 @@ export default function App() {
           }
         }
       });
+
+      // Connect Signal K (Still needs manual connect if signalk is chosen source)
+      skBridge.current.connect();
+
+      // Initialize Pattern Matcher
 
     } catch (error) {
       console.error('[App] Failed to initialize services:', error);
