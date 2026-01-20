@@ -24,7 +24,60 @@ Need weather data?
     └─ Coastal: Open-Meteo grid queries
 ```
 
-## Recommended: Official Python API (No Rate Limits)
+## ⭐ Recommended for 9km: Open-Meteo API
+
+**Best for:** Point forecasts, route forecasts, coastal navigation
+
+### Install
+```bash
+# No special packages needed - uses standard requests
+uv pip install requests
+```
+
+### Quick Start
+```bash
+# Single point forecast (Seattle)
+cd conductor
+uv run openmeteo_client.py --lat 47.6 --lon -122.3 --days 7 --output forecast.json
+
+# Custom parameters (wind only)
+uv run openmeteo_client.py --lat 47.6 --lon -122.3 --params wind_speed_10m,wind_direction_10m
+```
+
+### Python Example
+```python
+from conductor.openmeteo_client import OpenMeteoClient
+
+client = OpenMeteoClient()
+
+# Single point
+forecast = client.get_point_forecast(
+    latitude=47.6,
+    longitude=-122.3,
+    params=["wind_speed_10m", "wind_direction_10m", "pressure_msl"],
+    forecast_days=7
+)
+# Returns JSON with hourly forecasts (168 timesteps)
+
+# Multiple waypoints (route)
+waypoints = [(47.6, -122.3), (48.4, -123.0)]
+route_forecast = client.get_route_forecast(waypoints, forecast_days=3)
+```
+
+**Key Benefits:**
+- ✅ ECMWF HRES data (9km resolution)
+- ✅ No rate limits for non-commercial use
+- ✅ JSON format (easier than GRIB2)
+- ✅ Hourly data up to 16 days
+- ✅ No API key required
+
+**Limitations:**
+- ⚠️  Point-based queries (not full gridded fields)
+- ⚠️  Commercial use requires license
+
+---
+
+## Recommended for 25km: Official Python API (No Rate Limits)
 
 **Package:** `ecmwf-opendata` (uses Azure/AWS/Google mirrors)
 
