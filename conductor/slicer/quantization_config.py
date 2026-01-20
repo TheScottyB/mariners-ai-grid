@@ -108,7 +108,7 @@ def pack_to_int(data: np.ndarray, var_name: str) -> tuple[np.ndarray, dict]:
     rule = get_quantization_rule(var_name)
 
     # Shift to positive range and convert to int
-    shifted = (data - rule.offset) / rule.step
+    shifted = np.round((data - rule.offset) / rule.step)
 
     if rule.bits <= 8:
         packed = shifted.astype(np.uint8)
