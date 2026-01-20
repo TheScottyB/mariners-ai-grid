@@ -1,0 +1,7 @@
+services:
+  slicer:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
