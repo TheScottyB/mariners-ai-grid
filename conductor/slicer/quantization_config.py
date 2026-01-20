@@ -45,6 +45,10 @@ QUANTIZATION_RULES: Dict[str, QuantizationRule] = {
     "v": QuantizationRule(step=0.25, bits=16),
     "gust": QuantizationRule(step=0.5, bits=16),
 
+    # Pressure (Pa) -> 10 Pa (0.1 hPa/mb)
+    "msl": QuantizationRule(step=10.0, bits=16, offset=80000), # Offset helps for uint16 packing
+    "sp": QuantizationRule(step=10.0, bits=16, offset=80000),  # Surface pressure
+
     # Direction (degrees) -> 5 degrees
     # Wind vanes aren't accurate to 1°, and 5° significantly helps compression
     "mwd": QuantizationRule(step=5.0, bits=8),
@@ -53,6 +57,10 @@ QUANTIZATION_RULES: Dict[str, QuantizationRule] = {
     # Temperature (K) -> 0.5 K (1°F precision is sufficient)
     "t2m": QuantizationRule(step=0.5, bits=16, offset=200),  # Offset for packing
     "sst": QuantizationRule(step=0.1, bits=16, offset=270),  # SST needs more precision
+
+    # Waves (m, s)
+    "swh": QuantizationRule(step=0.1, bits=16),
+    "mwp": QuantizationRule(step=0.1, bits=16),
 
     # Precipitation (m) -> 0.0001 m (0.1 mm) - keep high precision for rain
     "tp": QuantizationRule(step=0.0001, bits=16),
