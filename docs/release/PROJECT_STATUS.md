@@ -25,9 +25,10 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
 *   **Identity:** "Shadow Auth" (Device-Level Identity via `expo-secure-store`).
 *   **State Management:** TanStack Query (server/weather state) + Zustand (client UI state).
 *   **Maps:** Mapbox GL Native (`@rnmapbox/maps`).
-*   **Storage:** `expo-sqlite/vec` (Vector storage for social hazards), Parquet (Weather Seeds).
+*   **Storage:** `@op-engineering/op-sqlite` (Zero-Latency Synchronous JSI) with `sqlite-vec` (vlasky v0.2.4 fork).
 *   **Inference:** `MarinerInference.ts` utilizing `onnxruntime-react-native` for NPU-accelerated GraphCast execution (implemented).
 *   **Social:** `SocialLayer.ts` and `GridSync.ts` for spatial hazard queries and fleet-wide CC0 synchronization (implemented).
+*   **Predictive:** `DebrisPredictor.ts` implementing Lagrangian drift forecasting (implemented).
 
 ### **B. The Conductor (Backend/Slicer)**
 *   **Language:** Python 3.12+ (Managed via `uv`).
@@ -66,6 +67,10 @@ This document serves as the "Source of Truth" for AI agents (Claude Code, Gemini
     *   **PatternAlert UI:** Tactical display with double-tap haptic feedback for DIVERGENT consensus.
     *   **Feature Flags:** RemoteConfig implemented for "Night Watch" and "Social Reporting" toggles.
     *   **AI Engine:** GraphCast ONNX model weight loading, tensor binding, and GeoJSON post-processing implemented.
+*   **Predictive Navigation:**
+    *   **Debris Tracking:** `DebrisPredictor.ts` implementation using Lagrangian drift physics (1h increments).
+    *   **Zero-Latency Search:** Migration to `@op-engineering/op-sqlite` + `vlasky/sqlite-vec` fork for SIMD-accelerated spatial queries.
+    *   **Tactical UI:** Mapbox overlays for wave direction and predicted debris tracks.
 *   **Integration:**
     *   `SeedUploader.ts` utility for cloud distribution.
     *   `MockNMEAStreamer.ts` utility for "Storm Sim" stress testing.
