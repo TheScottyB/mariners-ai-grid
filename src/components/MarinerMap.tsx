@@ -45,6 +45,8 @@ export interface VesselLocation {
 export interface MarinerMapProps {
   /** GeoJSON FeatureCollection of wind forecast data from local AI */
   forecastData?: FeatureCollection<Point>;
+  /** GeoJSON FeatureCollection of wave data */
+  waveData?: FeatureCollection<Point>;
   /** Current vessel position from Signal K bridge */
   vesselLocation: VesselLocation;
   /** Search radius for hazards in nautical miles */
@@ -59,6 +61,7 @@ export interface MarinerMapProps {
 
 export const MarinerMap: React.FC<MarinerMapProps> = ({
   forecastData,
+  waveData,
   vesselLocation,
   hazardSearchRadiusNm = 50,
   onHazardPress,
@@ -242,6 +245,22 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
 
         {/* User's device location (backup if no Signal K) */}
         <UserLocation visible={false} />
+
+        {/* 1.5. The Wave Layer (Directional Arrows) */}
+        {waveData && waveData.features.length > 0 && (
+          <ShapeSource id="waveSource" shape={waveData}>
+            <SymbolLayer
+              id="waveArrows"
+              style={{
+                iconImage: ['get', 'iconName'],
+                iconRotate: ['get', 'mwd'],
+                iconSize: ['get', 'iconSize'],
+                iconOpacity: 0.6,
+                iconAllowOverlap: false,
+              }}
+            />
+          </ShapeSource>
+        )}
 
         {/* 2. The AI Forecast Layer (Wind Barbs) */}
         {windGeoJSON.features.length > 0 && (

@@ -38,24 +38,17 @@ class QuantizationRule:
 # 2026 Tuning: Prioritize compression over unnecessary precision
 QUANTIZATION_RULES: Dict[str, QuantizationRule] = {
     # Wind Components (m/s) -> 0.25 m/s (~0.5 knots)
-    # Coarser than 0.1 but dramatically improves compression
+    # Sailors read analog gauges to ~1 kt. 0.5kt is operational precision.
     "u10": QuantizationRule(step=0.25, bits=16),
     "v10": QuantizationRule(step=0.25, bits=16),
-    "gust": QuantizationRule(step=0.5, bits=16),  # Gusts are inherently noisy
-
-    # Pressure (Pa) -> 10 Pa (0.1 hPa/mb)
-    # Keep high precision - critical for pattern matching
-    "msl": QuantizationRule(step=10.0, bits=16),
-
-    # Waves (m) -> 0.1 m (unchanged - sailors need this precision)
-    "swh": QuantizationRule(step=0.1, bits=8),  # Max 25.5m in uint8
-
-    # Wave Period (s) -> 0.5 s (coarser for better compression)
-    "mwp": QuantizationRule(step=0.5, bits=8),  # Max 127.5s in uint8
+    "u": QuantizationRule(step=0.25, bits=16),
+    "v": QuantizationRule(step=0.25, bits=16),
+    "gust": QuantizationRule(step=0.5, bits=16),
 
     # Direction (degrees) -> 5 degrees
     # Wind vanes aren't accurate to 1°, and 5° significantly helps compression
-    "mwd": QuantizationRule(step=5.0, bits=8),  # 72 possible values
+    "mwd": QuantizationRule(step=5.0, bits=8),
+    "wd": QuantizationRule(step=5.0, bits=8), # General direction
 
     # Temperature (K) -> 0.5 K (1°F precision is sufficient)
     "t2m": QuantizationRule(step=0.5, bits=16, offset=200),  # Offset for packing

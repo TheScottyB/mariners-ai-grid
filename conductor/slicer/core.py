@@ -194,6 +194,16 @@ class WeatherSeed:
     metadata: dict = field(default_factory=dict)
 
     @property
+    def boundingBox(self) -> dict:
+        """Returns bounding box in format expected by mobile app"""
+        return {
+            "latMin": self.bounding_box.lat_min,
+            "latMax": self.bounding_box.lat_max,
+            "lonMin": self.bounding_box.lon_min,
+            "lonMax": self.bounding_box.lon_max,
+        }
+
+    @property
     def shape(self) -> tuple[int, int, int]:
         """Data shape: (time_steps, lat_points, lon_points)"""
         return (

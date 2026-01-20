@@ -67,29 +67,38 @@ class AIFSSlicer:
         steps = list(range(0, forecast_hours + 1, time_step_hours))
         
         # 3. Fetch Data with Fallback
-        # Try today's 00Z run (date=0, time=0). If not available, try yesterday's 12Z (date=-1, time=12).
+        # ECMWF Open Data Advantage: Fetch native 0.1 deg (9km) resolution
+        pruner = VariablePruner("marine")
+        sfc_params = pruner.get_ecmwf_params("sfc")
+        pl_params = pruner.get_ecmwf_params("pl")
+        levels = [1000, 850, 500, 200] 
         
-        # Surface
-        sfc_params = ["msl", "10u", "10v", "2t"] 
         target_sfc = self.cache_dir / f"{self.client.model}_sfc.grib2"
-        
-        # Upper Air
-        pl_params = ["z", "q", "t", "u", "v"] 
-        levels = [1000, 850, 500] 
         target_pl = self.cache_dir / f"{self.client.model}_pl.grib2"
         
+        model_run_date = None
+        
+        # Try today's 00Z run first
         try:
             logger.info(f"Attempting to fetch latest {self.client.model} run (00Z)...")
             self._fetch_files(date=0, time=0, steps=steps, sfc_params=sfc_params, pl_params=pl_params, levels=levels, target_sfc=target_sfc, target_pl=target_pl)
             model_run_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         except Exception as e:
             logger.warning(f"00Z run not available: {e}. Falling back to previous 12Z...")
+            # Try yesterday's 12Z
             try:
                 self._fetch_files(date=-1, time=12, steps=steps, sfc_params=sfc_params, pl_params=pl_params, levels=levels, target_sfc=target_sfc, target_pl=target_pl)
                 model_run_date = (datetime.now(timezone.utc) - timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0)
             except Exception as e2:
-                logger.error(f"Fallback failed: {e2}")
-                raise RuntimeError("Could not fetch AIFS data from ECMWF Open Data.") from e2
+                logger.error(f"Fallback to 12Z failed: {e2}")
+                # Ultimate fallback: 00Z from yesterday
+                try:
+                    logger.warning("Attempting ultimate fallback to yesterday 00Z...")
+                    self._fetch_files(date=-1, time=0, steps=steps, sfc_params=sfc_params, pl_params=pl_params, levels=levels, target_sfc=target_sfc, target_pl=target_pl)
+                    model_run_date = (datetime.now(timezone.utc) - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                except Exception as e3:
+                    logger.error(f"Ultimate fallback failed: {e3}")
+                    raise RuntimeError("Could not fetch AIFS data from ECMWF Open Data after all fallbacks.") from e3
 
         # 4. Merge and Crop (Slicing)
         ds_sfc = xr.open_dataset(target_sfc, engine="cfgrib")

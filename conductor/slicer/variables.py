@@ -329,14 +329,28 @@ class VariablePruner:
             self.variables = [MARINE_VARIABLES[v] for v in MINIMAL_VARIABLES]
         elif variable_set == "standard":
             self.variables = [MARINE_VARIABLES[v] for v in STANDARD_VARIABLES]
-        elif variable_set == "full":
+        elif variable_set == "full" or variable_set == "marine":
             self.variables = list(MARINE_VARIABLES.values())
+        elif variable_set == "graphcast":
+            self.variables = [MARINE_VARIABLES[v] for v in GRAPHCAST_VARIABLES]
         else:
             raise ValueError(f"Unknown variable set: {variable_set}")
 
         self._cf_names = {v.cf_name for v in self.variables}
         self._short_names = {v.short_name for v in self.variables}
         self._param_ids = {v.param_id for v in self.variables}
+
+    def get_ecmwf_params(self, level_type: str = "sfc") -> list[str]:
+        """
+        Get short names for ECMWF retrieval.
+        
+        Args:
+            level_type: "sfc" (surface/heightAboveGround) or "pl" (isobaricInhPa)
+        """
+        if level_type == "sfc":
+            return [v.short_name for v in self.variables if v.level_type != "isobaricInhPa"]
+        else:
+            return [v.short_name for v in self.variables if v.level_type == "isobaricInhPa"]
 
     @property
     def cf_names(self) -> list[str]:

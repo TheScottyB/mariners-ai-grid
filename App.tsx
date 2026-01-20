@@ -217,6 +217,7 @@ export default function App() {
           <MarinerMap
             vesselLocation={vesselLocation}
             forecastData={seedManager.windGeoJSON || forecastData}
+            waveData={seedManager.waveGeoJSON || undefined}
             onReportHazard={(loc) => {
               setReportLocation(loc);
               setReportingVisible(true);

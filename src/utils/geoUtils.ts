@@ -25,6 +25,44 @@ export interface WindDataPoint {
   timestamp: number;
 }
 
+export interface WaveDataPoint {
+  lat: number;
+  lon: number;
+  swh: number; // Significant Wave Height (m)
+  mwd: number; // Mean Wave Direction (deg)
+  mwp: number; // Mean Wave Period (s)
+  timestamp: number;
+}
+
+/**
+ * Convert wave data to GeoJSON FeatureCollection for Mapbox.
+ */
+export function waveDataToGeoJSON(waveData: WaveDataPoint[]): FeatureCollection<Point> {
+  return {
+    type: 'FeatureCollection',
+    features: waveData.map((point, idx): Feature<Point> => {
+      return {
+        type: 'Feature',
+        id: `wave-${idx}`,
+        geometry: {
+          type: 'Point',
+          coordinates: [point.lon, point.lat],
+        },
+        properties: {
+          swh: point.swh,
+          mwd: point.mwd,
+          mwp: point.mwp,
+          timestamp: point.timestamp,
+          // Arrow icon for direction
+          iconName: 'wave-direction-arrow',
+          // Scaling factor based on wave height
+          iconSize: Math.max(0.5, Math.min(2.0, point.swh / 2)),
+        },
+      };
+    }),
+  };
+}
+
 /**
  * Convert marine hazards to GeoJSON FeatureCollection for Mapbox rendering.
  */

@@ -34,6 +34,7 @@ export interface UseSeedManagerResult {
 
   // Forecast data (for MarinerMap)
   windGeoJSON: FeatureCollection<Point> | null;
+  waveGeoJSON: FeatureCollection<Point> | null;
   forecastValidTime: Date | null;
 
   // Available seeds
@@ -67,6 +68,7 @@ export function useSeedManager(options: UseSeedManagerOptions = {}): UseSeedMana
   const [timestepCount, setTimestepCount] = useState(0);
 
   const [windGeoJSON, setWindGeoJSON] = useState<FeatureCollection<Point> | null>(null);
+  const [waveGeoJSON, setWaveGeoJSON] = useState<FeatureCollection<Point> | null>(null);
   const [forecastValidTime, setForecastValidTime] = useState<Date | null>(null);
 
   const [availableSeeds, setAvailableSeeds] = useState<SeedMetadata[]>([]);
@@ -145,13 +147,15 @@ export function useSeedManager(options: UseSeedManagerOptions = {}): UseSeedMana
       const targetTime = Date.now() + initialTimestepOffset * 60 * 60 * 1000;
       const timestepIdx = manager.getTimestepIndex(seedId, targetTime);
 
-      // Get wind GeoJSON for this timestep
+      // Get wind and wave GeoJSON for this timestep
       const geoJSON = await manager.getWindGeoJSON(seedId, timestepIdx);
+      const waveGeo = await manager.getWaveGeoJSON(seedId, timestepIdx);
 
       setActiveSeed(metadata);
       setActiveTimestep(timestepIdx);
       setTimestepCount(metadata.timestepCount);
       setWindGeoJSON(geoJSON);
+      setWaveGeoJSON(waveGeo);
 
       // Calculate valid time
       const startTime = metadata.forecastStartTime;
@@ -180,8 +184,10 @@ export function useSeedManager(options: UseSeedManagerOptions = {}): UseSeedMana
 
     try {
       const geoJSON = await managerRef.current.getWindGeoJSON(activeSeed.id, clampedIndex);
+      const waveGeo = await managerRef.current.getWaveGeoJSON(activeSeed.id, clampedIndex);
       setActiveTimestep(clampedIndex);
       setWindGeoJSON(geoJSON);
+      setWaveGeoJSON(waveGeo);
 
       // Update valid time
       const startTime = activeSeed.forecastStartTime;
@@ -288,6 +294,7 @@ export function useSeedManager(options: UseSeedManagerOptions = {}): UseSeedMana
     activeTimestep,
     timestepCount,
     windGeoJSON,
+    waveGeoJSON,
     forecastValidTime,
     availableSeeds,
     storageUsedMB,

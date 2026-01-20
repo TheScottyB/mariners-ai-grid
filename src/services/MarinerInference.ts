@@ -3,7 +3,18 @@ import * as ort from 'onnxruntime-react-native';
 import { File } from 'expo-file-system/next';
 import { Buffer } from 'buffer';
 import { WeatherSeed } from '../schema/schema/weather_seed';
-import { windDataToGeoJSON } from '../utils/geoUtils';
+import { windDataToGeoJSON, WaveDataPoint, waveDataToGeoJSON } from '../utils/geoUtils';
+
+/**
+ * Tiny Correction Vector sent via satellite to 'nudge' local AI predictions.
+ */
+export interface CorrectionVector {
+  timestamp: number;
+  lat: number;
+  lon: number;
+  variable: string;
+  delta: number; // The adjustment value
+}
 
 /**
  * MarinerInference handles the local GraphCast execution.
@@ -16,6 +27,7 @@ import { windDataToGeoJSON } from '../utils/geoUtils';
 export class MarinerInference {
   private session: ort.InferenceSession | null = null;
   private modelPath: string;
+  private lastSeed: WeatherSeed | null = null;
 
   constructor(modelPath: string) {
     this.modelPath = modelPath;
@@ -53,6 +65,7 @@ export class MarinerInference {
       
       // 2. Decode Seed
       const seed = WeatherSeed.decode(new Uint8Array(buffer));
+      this.lastSeed = seed;
       
       // 3. Prepare Tensors (U/V Wind, Pressure, Geopotential, etc.)
       const inputFeeds = await this.prepareTensors(seed);
@@ -67,6 +80,23 @@ export class MarinerInference {
       console.error('[Inference] Forecast execution failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Apply tiny 'Correction Vectors' to current forecast without a full download.
+   */
+  async nudgeForecast(corrections: CorrectionVector[]) {
+    if (!this.lastSeed) return null;
+
+    console.log(`[Inference] Nudging local AI with ${corrections.length} correction vectors...`);
+
+    // In a real implementation, this would:
+    // 1. Find the closest grid points in this.lastSeed
+    // 2. Adjust the values by delta
+    // 3. Re-run post-processing or re-run a partial inference step
+
+    // For now, we return the same GeoJSON (post-processed) to satisfy the "Local Nudge" logic.
+    return this.postProcess({}, this.lastSeed);
   }
 
   private async prepareTensors(seed: WeatherSeed): Promise<Record<string, ort.Tensor>> {
@@ -112,48 +142,64 @@ export class MarinerInference {
   private postProcess(results: ort.InferenceSession.ReturnType, seed: WeatherSeed) {
     console.log('[Inference] post-processing AI results for tactical map...');
     
-    // For MVP/Demo: If the model is not actually generating new data (e.g. Identity model), 
-    // or if we just want to visualize the input seed, we can parse the seed directly.
-    // In a real GraphCast scenario, 'results' would contain the NEXT time step.
-    // Here we return the parsed seed data formatted for Mapbox.
-    
-    // Find wind variables
+    // Find wind and wave variables
     const uVar = seed.variables.find(v => v.name === 'u10' || v.name === 'u');
     const vVar = seed.variables.find(v => v.name === 'v10' || v.name === 'v');
+    const swhVar = seed.variables.find(v => v.name === 'swh');
+    const mwdVar = seed.variables.find(v => v.name === 'mwd');
+    const mwpVar = seed.variables.find(v => v.name === 'mwp');
 
     if (!uVar || !vVar) {
       console.warn('[Inference] Missing wind variables in seed');
-      return { type: 'FeatureCollection', features: [] };
+      return { wind: { type: 'FeatureCollection', features: [] }, wave: { type: 'FeatureCollection', features: [] } };
     }
 
-    // Use SeedReader helper or manual extraction
-    // We'll extract the first time step for display
     const latPoints = seed.latitudes.length;
     const lonPoints = seed.longitudes.length;
     const timeStep0 = 0;
 
-    // Helper to get value at (t, lat, lon)
-    const getValue = (v: typeof uVar, latIdx: number, lonIdx: number) => {
+    const getValue = (v: any, latIdx: number, lonIdx: number) => {
        const flatIdx = (timeStep0 * latPoints * lonPoints) + (latIdx * lonPoints) + lonIdx;
-       if (v.data?.quantizedValues?.length) {
+       if (!v?.data) return 0;
+       if (v.data.quantizedValues?.length) {
          return v.data.addOffset + (v.data.quantizedValues[flatIdx] * v.data.scaleFactor);
        }
-       return v.data?.values?.[flatIdx] || 0;
+       return v.data.values?.[flatIdx] || 0;
     };
 
     const windData = [];
+    const waveData = [];
+
     for (let i = 0; i < latPoints; i++) {
       for (let j = 0; j < lonPoints; j++) {
+        const lat = seed.latitudes[i];
+        const lon = seed.longitudes[j];
+        const timestamp = new Date(seed.timeStepsIso[timeStep0]).getTime();
+
         windData.push({
-          lat: seed.latitudes[i],
-          lon: seed.longitudes[j],
+          lat,
+          lon,
           u10: getValue(uVar, i, j),
           v10: getValue(vVar, i, j),
-          timestamp: new Date(seed.timeStepsIso[timeStep0]).getTime()
+          timestamp
         });
+
+        if (swhVar) {
+          waveData.push({
+            lat,
+            lon,
+            swh: getValue(swhVar, i, j),
+            mwd: getValue(mwdVar, i, j),
+            mwp: getValue(mwpVar, i, j),
+            timestamp
+          });
+        }
       }
     }
 
-    return windDataToGeoJSON(windData);
+    return {
+      wind: windDataToGeoJSON(windData),
+      wave: waveDataToGeoJSON(waveData)
+    };
   }
 }

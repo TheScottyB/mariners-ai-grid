@@ -98,6 +98,9 @@ export class HazardService {
         description TEXT,
         lat REAL NOT NULL,
         lon REAL NOT NULL,
+        location_vec FLOAT[2],
+        drift_u REAL DEFAULT 0,
+        drift_v REAL DEFAULT 0,
         reported_at INTEGER NOT NULL,
         reporter_id TEXT NOT NULL,
         pressure_snapshot REAL,
@@ -115,6 +118,15 @@ export class HazardService {
     await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_location ON marine_hazards(lat, lon)');
     await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_expires ON marine_hazards(expires_at)');
     await this.db.execute('CREATE INDEX IF NOT EXISTS idx_hazards_type ON marine_hazards(type)');
+    
+    // Virtual table for high-performance vector spatial search (if not already handled by marine_hazards)
+    // Using sqlite-vec v0.2.x features
+    await this.db.execute(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS marine_hazards_vec USING vec0(
+        id TEXT PRIMARY KEY,
+        location float[2]
+      );
+    `);
   }
 
   /**
@@ -211,18 +223,21 @@ export class HazardService {
       expiresAt: now + decayRate * 60 * 60 * 1000 * 2, // Double decay rate for expiry
     };
 
+    const locationVec = new Float32Array([lat, lon]);
+
     await this.db.execute(
       `INSERT OR REPLACE INTO marine_hazards (
-        id, type, description, lat, lon, reported_at, reporter_id,
+        id, type, description, lat, lon, location_vec, reported_at, reporter_id,
         pressure_snapshot, motion_intensity, verified, confidence,
         verification_count, original_lat, original_lon, decay_rate, expires_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         report.id ?? "",
         report.type,
         report.description ?? null,
         report.lat,
         report.lon,
+        locationVec,
         report.reportedAt,
         report.reporterId,
         report.pressureSnapshot ?? null,
@@ -237,88 +252,20 @@ export class HazardService {
       ]
     );
 
+    // Also update virtual table for vector search
+    await this.db.execute(`DELETE FROM marine_hazards_vec WHERE id = ?`, [report.id]);
+    await this.db.execute(
+      `INSERT INTO marine_hazards_vec (id, location) VALUES (?, vec_f32(?))`,
+      [report.id, locationVec]
+    );
+
     console.log(`⚓ Mariner's Code: ${type} report logged (confidence: ${confidence.toFixed(2)})`);
     return report;
   }
 
   /**
-   * Validate sensor data against expected ranges for hazard type.
-   */
-  private validateSensorData(type: HazardType, sensors: SensorSnapshot): boolean {
-    if (type === 'squall' && sensors.pressure !== null) {
-      // Squall should correlate with low pressure
-      return sensors.pressure <= (WEATHER_PRESSURE_THRESHOLDS.squall.max);
-    }
-
-    if (type === 'surge') {
-      // High motion intensity validates surge report
-      return sensors.motionIntensity > 0.3;
-    }
-
-    // For other types, just having sensor data increases trust
-    return sensors.pressure !== null || sensors.motionIntensity > 0;
-  }
-
-  /**
-   * Verify an existing hazard (called when another boat confirms it).
-   */
-  async verifyHazard(hazardId: string): Promise<void> {
-    await this.db.execute(
-      `UPDATE marine_hazards
-       SET verification_count = verification_count + 1,
-           confidence = MIN(1.0, confidence + 0.15),
-           verified = CASE WHEN verification_count >= 1 THEN 1 ELSE verified END
-       WHERE id = ?`,
-      [hazardId]
-    );
-  }
-
-  /**
-   * Apply drift to floating hazards based on current data.
-   * Called periodically with surface current vectors.
-   */
-  async applyDrift(
-    surfaceCurrentU: number, // m/s eastward
-    surfaceCurrentV: number, // m/s northward
-    hoursElapsed: number
-  ): Promise<number> {
-    const driftingTypes: HazardType[] = ['debris', 'whale', 'fishing_gear'];
-    const now = Date.now();
-
-    const result = await this.db.execute(
-      `SELECT id, lat, lon FROM marine_hazards
-       WHERE type IN (${driftingTypes.map(() => '?').join(',')})
-       AND expires_at > ?`,
-      [...driftingTypes, now]
-    );
-
-    const hazards = result.rows || [];
-    let updatedCount = 0;
-
-    for (const hazard of hazards) {
-      const lat = hazard.lat as number;
-      const lon = hazard.lon as number;
-      const metersPerDegLat = 111000;
-      const metersPerDegLon = 111000 * Math.cos((lat * Math.PI) / 180);
-
-      const driftMetersE = surfaceCurrentU * hoursElapsed * 3600;
-      const driftMetersN = surfaceCurrentV * hoursElapsed * 3600;
-
-      const newLon = lon + driftMetersE / metersPerDegLon;
-      const newLat = lat + driftMetersN / metersPerDegLat;
-
-      await this.db.execute(
-        `UPDATE marine_hazards SET lat = ?, lon = ?, last_drift_update = ? WHERE id = ?`,
-        [newLat, newLon, now, hazard.id]
-      );
-      updatedCount++;
-    }
-
-    return updatedCount;
-  }
-
-  /**
-   * Get hazards near a location, applying confidence decay.
+   * Get hazards near a location using high-performance vector range queries.
+   * Leverages sqlite-vec v0.2.x range constraints.
    */
   async getHazardsNear(
     lat: number,
@@ -326,17 +273,25 @@ export class HazardService {
     radiusNm: number
   ): Promise<HazardReport[]> {
     const now = Date.now();
-    const latDelta = radiusNm / 60;
-    const lonDelta = radiusNm / (60 * Math.cos((lat * Math.PI) / 180));
-
+    const queryVec = new Float32Array([lat, lon]);
+    
+    /**
+     * THE "SURROUNDING" QUERY
+     * Uses sqlite-vec v0.2.x features:
+     * 1. MATCH query on virtual table
+     * 2. distance < radiusNm constraint (range query)
+     * 3. Join with metadata table
+     */
     const result = await this.db.execute(
-      `SELECT * FROM marine_hazards
-       WHERE lat BETWEEN ? AND ?
-       AND lon BETWEEN ? AND ?
-       AND expires_at > ?
-       ORDER BY reported_at DESC
-       LIMIT 200`,
-      [lat - latDelta, lat + latDelta, lon - lonDelta, lon + lonDelta, now]
+      `SELECT h.*, v.distance
+       FROM marine_hazards_vec v
+       JOIN marine_hazards h ON v.id = h.id
+       WHERE v.location MATCH vec_f32(?)
+         AND k = 100
+         AND v.distance < ?
+         AND h.expires_at > ?
+       ORDER BY h.reported_at DESC`,
+      [queryVec, radiusNm, now]
     );
 
     const rows = result.rows || [];
@@ -367,7 +322,6 @@ export class HazardService {
           expiresAt: row.expires_at,
         } as HazardReport;
       })
-      .filter((h) => distanceNM(lat, lon, h.lat, h.lon) <= radiusNm)
       .filter((h) => h.confidence > 0.1);
   }
 

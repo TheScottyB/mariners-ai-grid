@@ -14,7 +14,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { tableFromIPC } from 'apache-arrow';
 import type { FeatureCollection, Point } from 'geojson';
 
-import { windDataToGeoJSON, WindDataPoint } from '../utils/geoUtils';
+import { windDataToGeoJSON, WindDataPoint, WaveDataPoint, waveDataToGeoJSON } from '../utils/geoUtils';
 import { SeedReader } from './SeedReader';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -55,6 +55,7 @@ export interface ParsedSeed {
 export interface SeedTimestep {
   validTime: number;             // UTC timestamp for this forecast hour
   windData: WindDataPoint[];     // Gridded wind U/V components
+  waveData?: WaveDataPoint[];    // Gridded wave height/direction/period
 }
 
 export interface SeedManagerConfig {
@@ -263,6 +264,17 @@ export class SeedManager {
       throw new Error(`Seed or timestep not found: ${seedId}`);
     }
     return windDataToGeoJSON(seed.timesteps[timestepIndex].windData);
+  }
+
+  /**
+   * Get wave data for a specific timestep.
+   */
+  async getWaveGeoJSON(seedId: string, timestepIndex: number = 0): Promise<FeatureCollection<Point> | null> {
+    const seed = this.seedCache.get(seedId);
+    if (!seed || !seed.timesteps[timestepIndex] || !seed.timesteps[timestepIndex].waveData) {
+      return null;
+    }
+    return waveDataToGeoJSON(seed.timesteps[timestepIndex].waveData!);
   }
 
   /**
