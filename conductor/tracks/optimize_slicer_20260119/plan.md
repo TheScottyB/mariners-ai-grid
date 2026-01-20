@@ -36,4 +36,4 @@
 - [x] Task: End-to-End Validation 823d62f
     - [x] Sub-task: Run the pipeline on the sample GRIB2 file.
     - [x] Sub-task: Verify the output "Seed" can be read back and contains correct data values (fidelity check).
-- [~] Task: Conductor - User Manual Verification 'Phase 4: Integration & Pipeline' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 4: Integration & Pipeline' aa7eeb9
