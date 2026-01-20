@@ -13,6 +13,7 @@
  */
 
 import * as Location from 'expo-location';
+import { Magnetometer, Barometer } from 'expo-sensors';
 import { SignalKBridge } from './SignalKBridge';
 import { MockNMEAStreamer, MockScenario } from './MockNMEAStreamer';
 import { TelemetrySnapshot } from './PatternMatcher';
@@ -38,8 +39,10 @@ export class TelemetryService {
 
   private lastSnapshot: TelemetrySnapshot | null = null;
   
-  // Temporary state for partial updates from mock streams
+  // Temporary state for partial updates
   private vesselState: Partial<TelemetrySnapshot> = {};
+  private deviceHeading: number = 0;
+  private devicePressure: number = 1013;
 
   private constructor(skBridge: SignalKBridge) {
     this.skBridge = skBridge;
@@ -75,8 +78,33 @@ export class TelemetryService {
       }
     });
 
-    // 2. Setup Device GPS Polling (if needed for standalone)
+    // 2. Setup Device Sensors (Compass + Barometer)
+    this.startDeviceSensors();
+
+    // 3. Setup Device GPS Polling
     this.startDeviceLocationPolling();
+  }
+
+  private async startDeviceSensors() {
+    // Magnetometer for Heading
+    const magAvailable = await Magnetometer.isAvailableAsync();
+    if (magAvailable) {
+      Magnetometer.addListener((data) => {
+        // Convert mag field to heading (simplified)
+        let angle = Math.atan2(data.y, data.x) * (180 / Math.PI);
+        if (angle < 0) angle += 360;
+        this.deviceHeading = angle;
+      });
+      Magnetometer.setUpdateInterval(100); // 10Hz
+    }
+
+    // Barometer for Pressure
+    const baroAvailable = await Barometer.isAvailableAsync();
+    if (baroAvailable) {
+      Barometer.addListener(({ pressure }) => {
+        this.devicePressure = pressure;
+      });
+    }
   }
 
   setSource(source: TelemetrySource) {
@@ -145,10 +173,10 @@ export class TelemetryService {
         if (this.source === 'device') {
           const snapshot: TelemetrySnapshot = {
             position: { lat: location.coords.latitude, lon: location.coords.longitude },
-            heading: location.coords.heading || 0,
+            heading: this.deviceHeading || location.coords.heading || 0,
             sog: Math.max(0, location.coords.speed ? (location.coords.speed * 1.94384) : 0),
+            barometer: this.devicePressure,
             timestamp: location.timestamp,
-            // Device hardware typically lacks barometer/wind
           };
           this.emit(snapshot);
         }
