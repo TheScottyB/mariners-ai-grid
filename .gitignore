@@ -46,6 +46,9 @@ __pycache__/
 # Claude Code local settings
 .claude/settings.local.json
 
+# Build artifacts
+build-*.tar.gz
+
 # Deployment telemetry logs
 .mag-telemetry/
 
