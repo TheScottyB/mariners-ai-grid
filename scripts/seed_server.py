@@ -131,6 +131,7 @@ def main():
     print(f"   Example: http://localhost:{PORT}/{seeds[0].name if seeds else 'mock_*.seed.zst'}")
     print("\n   Press Ctrl+C to stop\n")
 
+    socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", PORT), SeedHTTPRequestHandler) as httpd:
         try:
             httpd.serve_forever()

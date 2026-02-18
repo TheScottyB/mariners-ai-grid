@@ -210,14 +210,17 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
                       <SymbolLayer
                         id="waveArrows"
                         style={{
-                          textField: '▲',
+                          textField: '▼',  // Downward triangle for waves
                           textRotate: ['get', 'mwd'],
-                          textSize: ['interpolate', ['linear'], ['get', 'swh'], 0, 8, 5, 24],
-                          textColor: '#00BFFF',
-                          textOpacity: 0.7,
+                          // Size scales with wave height: 14pt at 0m, up to 32pt at 4m+
+                          textSize: ['interpolate', ['linear'], ['get', 'swh'], 0, 14, 0.5, 17, 1, 20, 2, 26, 4, 32],
+                          textColor: '#00D4FF',  // Bright cyan - matches nautical theme
+                          textHaloColor: '#001B3A',  // Dark navy outline
+                          textHaloWidth: 1.5,
+                          textOpacity: 0.9,
                           textAllowOverlap: true,
                           textIgnorePlacement: true,
-                          textOffset: [0, 1.2], // Offset down so it sits below the wind barb
+                          textOffset: [0, 1.6],  // Offset below wind barb
                         }}
                       />
                     </ShapeSource>
@@ -237,8 +240,8 @@ export const MarinerMap: React.FC<MarinerMapProps> = ({
                           iconRotate: ['get', 'wind_direction'],
                           iconAllowOverlap: true,
                           iconIgnorePlacement: true,
-                          iconSize: 1.0,
-                          iconOpacity: dataFreshness === 'expired' ? 0.4 : 0.9,
+                          iconSize: 0.25,  // 256px icons scaled to ~64px display
+                          iconOpacity: dataFreshness === 'expired' ? 0.4 : 0.95,
                         }}
                       />
                     </ShapeSource>

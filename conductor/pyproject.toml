@@ -46,6 +46,7 @@ dependencies = [
     "pydantic>=2.6.0",           # Data validation
     "ecmwf-opendata>=0.3.26",
     "pillow>=12.1.0",
+    "global-land-mask>=1.0.0",     # Fast land/ocean detection for wave filtering
     "fastapi>=0.128.0",
     "uvicorn>=0.40.0",
     "pandas>=2.3.3",

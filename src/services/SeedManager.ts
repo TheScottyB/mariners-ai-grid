@@ -597,33 +597,27 @@ export class SeedManager {
 
 
     async getWindGeoJSON(seedId: string, timestepIndex: number = 0): Promise<FeatureCollection<Point>> {
+      let seed = this.seedCache.get(seedId);
 
-
-
-      const seed = this.seedCache.get(seedId);
-
-
-
-      if (!seed || !seed.timesteps[timestepIndex]) {
-
-
-
-        // Return empty instead of throwing
-
-
-
-        return { type: 'FeatureCollection', features: [] };
-
-
-
+      // If not cached, try to re-parse from disk
+      if (!seed) {
+        const metadata = this.metadataIndex.find(m => m.id === seedId);
+        if (metadata) {
+          console.log(`[SeedManager] getWindGeoJSON: Re-parsing seed from disk: ${metadata.filename}`);
+          const targetFile = new File(this.seedDir, metadata.filename);
+          if (targetFile.exists) {
+            const parsed = await this.parseSeed(targetFile.uri, metadata.format);
+            this.seedCache.set(seedId, { metadata, timesteps: parsed.timesteps });
+            seed = this.seedCache.get(seedId);
+          }
+        }
       }
 
-
+      if (!seed || !seed.timesteps[timestepIndex]) {
+        return { type: 'FeatureCollection', features: [] };
+      }
 
       return windDataToGeoJSON(seed.timesteps[timestepIndex].windData);
-
-
-
     }
 
 
@@ -633,26 +627,35 @@ export class SeedManager {
 
 
     async getWaveGeoJSON(seedId: string, timestepIndex: number = 0): Promise<FeatureCollection<Point> | null> {
+      let seed = this.seedCache.get(seedId);
 
-
-
-      const seed = this.seedCache.get(seedId);
-
-
-
-      if (!seed || !seed.timesteps[timestepIndex] || !seed.timesteps[timestepIndex].waveData) {
-
-
-
-        return null;
-
-
-
+      // If not cached, try to re-parse from disk
+      if (!seed) {
+        const metadata = this.metadataIndex.find(m => m.id === seedId);
+        if (metadata) {
+          console.log(`[SeedManager] getWaveGeoJSON: Re-parsing seed from disk: ${metadata.filename}`);
+          const targetFile = new File(this.seedDir, metadata.filename);
+          if (targetFile.exists) {
+            const parsed = await this.parseSeed(targetFile.uri, metadata.format);
+            this.seedCache.set(seedId, { metadata, timesteps: parsed.timesteps });
+            seed = this.seedCache.get(seedId);
+          }
+        }
       }
 
+      if (!seed || !seed.timesteps[timestepIndex]) {
+        console.log(`[SeedManager] getWaveGeoJSON: No seed or timestep after re-parse attempt`);
+        return null;
+      }
 
+      const waveData = seed.timesteps[timestepIndex].waveData;
+      console.log(`[SeedManager] getWaveGeoJSON: waveData length = ${waveData?.length ?? 'undefined'}`);
 
-      return waveDataToGeoJSON(seed.timesteps[timestepIndex].waveData!);
+      if (!waveData || waveData.length === 0) {
+        return null;
+      }
+
+      return waveDataToGeoJSON(waveData);
 
 
 

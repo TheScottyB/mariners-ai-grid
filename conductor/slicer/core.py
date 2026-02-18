@@ -563,6 +563,7 @@ class ECMWFHRESSlicer:
         Generate realistic mock data for testing without CDS access.
 
         Uses physically plausible value ranges and correlations.
+        Wave data (swh, mwd, mwp) is masked to ocean-only points.
         """
         # Build coordinate arrays
         lats = np.arange(bbox.lat_min, bbox.lat_max + 0.01, self.resolution)
@@ -575,8 +576,15 @@ class ECMWFHRESSlicer:
 
         shape = (n_times, len(lats), len(lons))
 
+        # Create ocean mask for wave variables
+        ocean_mask = self._create_ocean_mask(lats, lons)
+        land_mask_3d = ~np.broadcast_to(ocean_mask[None, :, :], shape)
+
         # Generate mock data with realistic distributions
         np.random.seed(42)  # Reproducible for testing
+
+        # Wave variable names to apply ocean masking
+        wave_vars = {"swh", "mwp", "mwd"}
 
         variables = {}
         for var in var_defs:
@@ -600,7 +608,15 @@ class ECMWFHRESSlicer:
             time_trend = np.linspace(0, 1, n_times)[:, None, None] * spread * 0.5
 
             data = np.clip(base + spatial + time_trend, low, high).astype(np.float32)
+
+            # Apply ocean mask to wave variables - set land points to NaN
+            if var.cf_name in wave_vars:
+                data[land_mask_3d] = np.nan
+
             variables[var.cf_name] = data
+
+        ocean_count = int(np.sum(ocean_mask))
+        land_count = ocean_mask.size - ocean_count
 
         return WeatherSeed(
             seed_id=f"{model_source.replace('ecmwf_', '')}_{bbox.cache_key()}_{model_run.strftime('%Y%m%d%H')}",
@@ -619,8 +635,23 @@ class ECMWFHRESSlicer:
             metadata={
                 "mock_data": True,
                 "variable_count": len(variables),
+                "ocean_points": ocean_count,
+                "land_points": land_count,
             },
         )
+
+    def _create_ocean_mask(self, lats: np.ndarray, lons: np.ndarray) -> np.ndarray:
+        """
+        Create a 2D boolean mask where True = ocean, False = land.
+        Uses global-land-mask if available, otherwise assumes all ocean.
+        """
+        try:
+            from global_land_mask import globe
+            lat_grid, lon_grid = np.meshgrid(lats, lons, indexing='ij')
+            return globe.is_ocean(lat_grid, lon_grid)
+        except ImportError:
+            logger.warning("global-land-mask not installed, wave data will include land points")
+            return np.ones((len(lats), len(lons)), dtype=bool)
 
 
 class SpatialSlicer:

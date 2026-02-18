@@ -123,12 +123,12 @@ export class ParquetReader {
             });
         }
         
-        // Add Wave Point (if data exists)
-        if (swh !== undefined) {
+        // Add Wave Point (if data exists and is valid - NaN means land point)
+        if (swh !== undefined && swh !== null && !Number.isNaN(swh)) {
              // Basic WaveDataPoint structure (inferring)
              ts.waveData?.push({
-                 lat, lon, swh, 
-                 mwp: mwp ?? 0, 
+                 lat, lon, swh,
+                 mwp: mwp ?? 0,
                  mwd: mwd ?? 0,
                  timestamp: validTime
              });
