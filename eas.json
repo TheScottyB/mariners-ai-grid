@@ -15,6 +15,9 @@
       "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "APP_VARIANT": "development"
+      },
       "ios": {
         "simulator": true
       }
@@ -24,6 +27,9 @@
       "developmentClient": true,
       "distribution": "internal",
       "channel": "preview",
+      "env": {
+        "APP_VARIANT": "preview"
+      },
       "ios": {
         "simulator": false
       }
