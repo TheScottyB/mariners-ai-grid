@@ -19,7 +19,10 @@
     "test:ui": "vitest run src/components",
     "test:logic": "vitest run src/services",
     "test:sovereign": "vitest run src/services/__tests__",
-    "doctor": "npx expo-doctor"
+    "doctor": "npx expo-doctor",
+    "screenshots:capture": "node scripts/capture_screenshots.mjs",
+    "screenshots:verify": "node scripts/verify_screenshots.mjs",
+    "qc-screenshots": "pnpm run screenshots:verify"
   },
   "op-sqlite": {
     "sqliteVec": true,

@@ -182,6 +182,8 @@ describe('Mariner AI Grid E2E Pipeline', () => {
     expect(stats.lastCheckTime).toBe(timestamps[cycles - 1]);
     
     console.log('[E2E] Stress test passed: Buffer integrity maintained.');
+  });
+
   it('should process a real .seed.zst payload from local server', async () => {
     // 1. Fetch Real Seed (Integration)
     // Note: Requires the python seed server to be running on port 8082
