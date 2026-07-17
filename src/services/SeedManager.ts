@@ -27,7 +27,37 @@ import { WeatherSeed } from '../schema/schema/weather_seed';
 
 
 
-// ... (Types remain the same) ...
+export interface SeedMetadata {
+  id: string;
+  filename: string;
+  format: 'parquet' | 'protobuf';
+  createdAt: number;
+  downloadedAt: number;
+  expiresAt: number;
+  bounds: { north: number; south: number; east: number; west: number };
+  forecastStartTime: number;
+  forecastEndTime: number;
+  timestepCount: number;
+  fileSizeBytes: number;
+  source: 'wifi' | 'airdrop' | 'local' | 'starlink';
+}
+
+export interface SeedTimestep {
+  validTime: number;
+  windData: WindDataPoint[];
+  waveData?: WaveDataPoint[];
+}
+
+interface ParsedSeed {
+  metadata: SeedMetadata;
+  timesteps: SeedTimestep[];
+}
+
+interface SeedManagerConfig {
+  seedDirectory: string;
+  maxStorageMB: number;
+  defaultExpiryHours: number;
+}
 
 
 

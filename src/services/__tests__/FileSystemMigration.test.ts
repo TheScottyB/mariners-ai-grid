@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SeedReader } from '../SeedReader';
 import { VesselSnapshot } from '../VesselSnapshot';
+import type { ConsensusData } from '../../components/PatternAlert';
 
 // Mock expo-file-system with new API
 vi.mock('expo-file-system', () => {
@@ -191,9 +192,14 @@ describe('File System Migration to SDK 54', () => {
         wavePeriod: 0,
       };
 
-      const consensus = {
-        level: 'divergent' as const,
-        graphCastPrediction: { confidence: 0.8 },
+      const consensus: ConsensusData = {
+        localMatch: {
+          patternId: 'test-pattern',
+          label: 'Divergent Conditions',
+          similarity: 0.72,
+          outcome: 'storm',
+        },
+        graphCastPrediction: { outcome: 'storm', confidence: 0.8, validTime: new Date() },
       };
 
       const snapshot = await vesselSnapshot.captureDivergence(

@@ -18,7 +18,7 @@ vi.mock('expo-file-system', () => {
     size: number = 0;
     
     constructor(path: string) {
-      this.uri = typeof path === 'string' ? path : path.uri || 'test://';
+      this.uri = path;
     }
     
     delete = vi.fn();

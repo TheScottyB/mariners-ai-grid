@@ -54,7 +54,8 @@ const mockFileSystem = {
   makeDirectoryAsync: vi.fn(),
   copyAsync: vi.fn(),
   FileSystemFile: class {
-    constructor(path) { this.uri = path; }
+    uri: string;
+    constructor(path: string) { this.uri = path; }
     exists = true;
     delete = vi.fn();
     write = vi.fn();
@@ -64,7 +65,8 @@ const mockFileSystem = {
     static downloadFileAsync = vi.fn();
   },
   FileSystemDirectory: class {
-    constructor(path) { this.uri = path; }
+    uri: string;
+    constructor(path: string) { this.uri = path; }
     exists = true;
     create = vi.fn();
     delete = vi.fn();
